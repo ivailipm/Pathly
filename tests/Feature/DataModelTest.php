@@ -5,14 +5,13 @@ use App\Models\Milestone;
 use App\Models\Subject;
 use App\Models\Task;
 
-it('returns milestones sorted by position', function (){
+it('returns milestones sorted by position', function () {
     $subject = Subject::factory()->create();
 
     Milestone::factory()->for($subject)->create(['title' => 'Second', 'position' => 2]);
     Milestone::factory()->for($subject)->create(['title' => 'First', 'position' => 1]);
 
-    expect($subject->milestones->pluck('title')->all())->toBe(['First','Second']);
-    
+    expect($subject->milestones->pluck('title')->all())->toBe(['First', 'Second']);
 });
 
 it('gives a new task the todo status by default', function () {
