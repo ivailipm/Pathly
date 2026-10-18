@@ -19,7 +19,7 @@ return new class extends Migration
             $table->unsignedInteger('position');
             $table->timestamps();
 
-            $table->index(['subject_id','position']);
+            $table->index(['subject_id', 'position']);
         });
     }
 
