@@ -8,7 +8,18 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $milestone_id
+ * @property string $title
+ * @property string|null $url
+ * @property TaskStatus $status
+ * @property int $position
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 #[Fillable(['milestone_id', 'title', 'url', 'status', 'position'])]
 class Task extends Model
 {
