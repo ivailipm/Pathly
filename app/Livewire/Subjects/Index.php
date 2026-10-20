@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Subjects;
 
+use App\Enums\TaskStatus;
 use App\Livewire\Forms\SubjectForm;
 use App\Models\Subject;
 use Illuminate\Contracts\View\View;
@@ -27,14 +28,17 @@ class Index extends Component
     }
 
     /**
-     * The current user's subjects, newest first.
+     * The current user's subjects, newest first, with task counts for the progress bars.
      *
      * @return Collection<int, Subject>
      */
     #[Computed]
     public function subjects(): Collection
     {
-        return Auth::user()->subjects()->latest('id')->get();
+        return Auth::user()->subjects()
+            ->withCount(['tasks', 'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done)])
+            ->latest('id')
+            ->get();
     }
 
     public function render(): View

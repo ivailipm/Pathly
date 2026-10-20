@@ -150,3 +150,16 @@ it('shows an empty state when the subject has no milestones', function () {
         ->test(Show::class, ['subject' => $subject])
         ->assertSee('No milestones yet.');
 });
+
+it('shows the progress of each milestone and of the whole subject', function () {
+    $subject = Subject::factory()->create();
+    $basics = Milestone::factory()->for($subject)->create(['position' => 1]);
+    $routing = Milestone::factory()->for($subject)->create(['position' => 2]);
+    Task::factory()->for($basics)->done()->create();
+    Task::factory()->for($basics)->inProgress()->create();
+    Task::factory()->for($routing)->done()->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSeeInOrder(['2 of 3 tasks done', '1 of 2 tasks done', '1 of 1 task done']);
+});

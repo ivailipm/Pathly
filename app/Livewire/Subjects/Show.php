@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Subjects;
 
+use App\Enums\TaskStatus;
 use App\Livewire\Forms\MilestoneForm;
 use App\Livewire\Forms\SubjectForm;
 use App\Models\Milestone;
@@ -79,7 +80,9 @@ class Show extends Component
     #[Computed]
     public function milestones(): Collection
     {
-        return $this->subject->milestones()->get();
+        return $this->subject->milestones()
+            ->withCount(['tasks', 'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done)])
+            ->get();
     }
 
     public function render(): View
