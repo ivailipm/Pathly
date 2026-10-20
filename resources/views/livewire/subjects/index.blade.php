@@ -15,6 +15,7 @@
                     @if ($subject->description)
                         <flux:text class="mt-1">{{ $subject->description }}</flux:text>
                     @endif
+                    <x-progress-summary :done="$subject->done_tasks_count" :total="$subject->tasks_count" class="mt-3" />
                 </flux:card>
             </a>
         @empty

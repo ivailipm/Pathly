@@ -37,6 +37,12 @@
         </div>
     @endif
 
+    <x-progress-summary
+        :done="$this->milestones->sum('done_tasks_count')"
+        :total="$this->milestones->sum('tasks_count')"
+        class="max-w-md"
+    />
+
     <div class="space-y-3">
         <flux:heading size="lg" level="2">{{ __('Milestones') }}</flux:heading>
 
@@ -47,6 +53,7 @@
                     @if ($milestone->description)
                         <flux:text class="mt-1">{{ $milestone->description }}</flux:text>
                     @endif
+                    <x-progress-summary :done="$milestone->done_tasks_count" :total="$milestone->tasks_count" class="mt-3" />
                 </flux:card>
             </a>
         @empty

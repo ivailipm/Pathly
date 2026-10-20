@@ -12,7 +12,7 @@ enum TaskStatus: string
     {
         return match ($this) {
             self::Todo => 'To do',
-            self::InProgress => 'In Progress',
+            self::InProgress => 'In progress',
             self::Done => 'Done',
         };
     }

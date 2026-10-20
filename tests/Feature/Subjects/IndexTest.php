@@ -1,8 +1,11 @@
 <?php
 
 use App\Livewire\Subjects\Index;
+use App\Models\Milestone;
 use App\Models\Subject;
+use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 it('redirects guests to the login page', function () {
@@ -77,4 +80,42 @@ it('shows an empty state when the user has no subjects', function () {
     Livewire::actingAs(User::factory()->create())
         ->test(Index::class)
         ->assertSee('No subjects yet. Add your first one above.');
+});
+
+it('shows how many tasks of each subject are done', function () {
+    $user = User::factory()->create();
+
+    $laravel = Subject::factory()->for($user)->create();
+    $basics = Milestone::factory()->for($laravel)->create(['position' => 1]);
+    $routing = Milestone::factory()->for($laravel)->create(['position' => 2]);
+    Task::factory()->for($basics)->done()->create();
+    Task::factory()->for($basics)->inProgress()->create();
+    Task::factory()->for($routing)->done()->create();
+
+    $single = Milestone::factory()->for(Subject::factory()->for($user))->create();
+    Task::factory()->for($single)->done()->create();
+
+    Subject::factory()->for($user)->create();
+
+    // Another user's done task must not change the counts
+    Task::factory()->done()->create();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->assertSee('2 of 3 tasks done')
+        ->assertSee('1 of 1 task done')
+        ->assertSee('No tasks yet');
+
+    it('counts tasks without a query per subject', function () {
+        $userWithOne = User::factory()->create();
+        $userWithThree = User::factory()->create();
+        Subject::factory()->for($userWithOne)->has(Milestone::factory()->has(Task::factory()))->create();
+        Subject::factory()->count(3)->for($userWithThree)->has(Milestone::factory()->has(Task::factory()))->create();
+
+        DB::enableQueryLog();
+
+        Livewire::actingAs($userWithThree)->test(Index::class);
+
+        expect(count(DB::getQueryLog()))->toBe($queriesForOne);
+    });
 });
