@@ -10,6 +10,7 @@ use App\Models\Subject;
 use App\Models\Task;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -81,20 +82,6 @@ class Show extends Component
         $this->taskForm->reset();
     }
 
-    /**
-     * Tick a task off, or untick it. An in-progress task counts as not done.
-     */
-    public function toggle(int $taskId): void
-    {
-        $this->authorize('update', $this->subject);
-
-        $task = $this->findTask($taskId);
-
-        $task->update([
-            'status' => $task->status === TaskStatus::Done ? TaskStatus::Todo : TaskStatus::Done,
-        ]);
-    }
-
     public function editTask(int $taskId): void
     {
         $task = $this->findTask($taskId);
@@ -133,12 +120,46 @@ class Show extends Component
     }
 
     /**
-     * @return Collection<int, Task>
+     * Move a task to a column and a spot in it. Called by the "Move to" menu and by wire:sort,
+     * which passes the dropped task's id, its index in the column and the column's status.
+     */
+    public function moveTask(int $taskId, int $position, string $status): void
+    {
+        $this->authorize('update', $this->subject);
+
+        // A string, not a TaskStatus parameter: Livewire would turn an unknown value into null
+        $target = TaskStatus::tryFrom($status) ?? abort(422);
+
+        DB::transaction(function () use ($taskId, $position, $target) {
+            $task = $this->findTask($taskId);
+
+            $columns = $this->toColumns($this->milestone->tasks()->whereKeyNot($task->id)->get());
+
+            $task->status = $target;
+            $column = $columns[$target->value];
+            $column->splice(max(0, min($position, $column->count())), 0, [$task]);
+
+            // Renumber the whole milestone in board order; save() skips tasks that didn't change
+            $next = 1;
+
+            foreach ($columns as $columnTasks) {
+                foreach ($columnTasks as $columnTask) {
+                    $columnTask->position = $next++;
+                    $columnTask->save();
+                }
+            }
+        });
+    }
+
+    /**
+     * The milestone's tasks as board columns, keyed by status value.
+     *
+     * @return array<string, Collection<int, Task>>
      */
     #[Computed]
-    public function tasks(): Collection
+    public function columns(): array
     {
-        return $this->milestone->tasks()->get();
+        return $this->toColumns($this->milestone->tasks()->get());
     }
 
     public function render(): View
@@ -152,5 +173,22 @@ class Show extends Component
     private function findTask(int $taskId): Task
     {
         return $this->milestone->tasks()->findOrFail($taskId);
+    }
+
+    /**
+     * Split tasks into board columns: one per status, in board order, even when empty.
+     *
+     * @param  Collection<int, Task>  $tasks
+     * @return array<string, Collection<int, Task>>
+     */
+    private function toColumns(Collection $tasks): array
+    {
+        $columns = [];
+
+        foreach (TaskStatus::cases() as $status) {
+            $columns[$status->value] = $tasks->filter(fn (Task $task) => $task->status === $status)->values();
+        }
+
+        return $columns;
     }
 }
