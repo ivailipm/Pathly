@@ -59,12 +59,23 @@
                     <flux:text size="sm">{{ __('Nothing here yet') }}</flux:text>
                 @endif
 
-                <div class="min-h-24 space-y-2">
+                {{-- wire:sort must come first: Livewire stops reading this element's attributes at wire:sort:group --}}
+                <div
+                    wire:sort="moveTask"
+                    wire:sort:group="tasks"
+                    wire:sort:group-id="{{ $status->value }}"
+                    class="min-h-24 space-y-2"
+                >
                     @foreach ($this->columns[$status->value] as $task)
                         <div
                             wire:key="task-{{ $task->id }}"
+                            wire:sort:item="{{ $task->id }}"
                             class="flex items-start gap-2 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
                         >
+                            <div wire:sort:handle aria-hidden="true" class="mt-0.5 cursor-grab text-zinc-400 active:cursor-grabbing">
+                                <flux:icon.grip-vertical variant="micro" />
+                            </div>
+
                             @if ($editingTaskId === $task->id)
                                 <form wire:submit="updateTask" class="min-w-0 flex-1 space-y-3">
                                     <flux:input wire:model="editTaskForm.title" :label="__('Title')" required />
