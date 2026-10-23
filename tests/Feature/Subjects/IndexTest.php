@@ -105,17 +105,22 @@ it('shows how many tasks of each subject are done', function () {
         ->assertSee('2 of 3 tasks done')
         ->assertSee('1 of 1 task done')
         ->assertSee('No tasks yet');
+});
 
-    it('counts tasks without a query per subject', function () {
-        $userWithOne = User::factory()->create();
-        $userWithThree = User::factory()->create();
-        Subject::factory()->for($userWithOne)->has(Milestone::factory()->has(Task::factory()))->create();
-        Subject::factory()->count(3)->for($userWithThree)->has(Milestone::factory()->has(Task::factory()))->create();
+it('counts tasks without a query per subject', function () {
+    $userWithOne = User::factory()->create();
+    $userWithThree = User::factory()->create();
+    Subject::factory()->for($userWithOne)->has(Milestone::factory()->has(Task::factory()))->create();
+    Subject::factory()->count(3)->for($userWithThree)->has(Milestone::factory()->has(Task::factory()))->create();
 
-        DB::enableQueryLog();
+    DB::enableQueryLog();
 
-        Livewire::actingAs($userWithThree)->test(Index::class);
+    Livewire::actingAs($userWithOne)->test(Index::class);
+    $queriesForOne = count(DB::getQueryLog());
 
-        expect(count(DB::getQueryLog()))->toBe($queriesForOne);
-    });
+    DB::flushQueryLog();
+
+    Livewire::actingAs($userWithThree)->test(Index::class);
+
+    expect(count(DB::getQueryLog()))->toBe($queriesForOne);
 });
