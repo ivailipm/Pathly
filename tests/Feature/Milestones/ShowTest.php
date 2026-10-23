@@ -411,6 +411,6 @@ it('makes each column a sortable list of tasks', function () {
     expect(substr_count($html, 'wire:sort="moveTask"'))->toBe(3);
 
     foreach ($tasks as $task) {
-        expect($html)->toContain('wire:sort:item="' . $task->id . '"');
+        expect($html)->toContain('wire:sort:item="'.$task->id.'"');
     }
 });
