@@ -401,3 +401,16 @@ it('offers to move a task to the other columns', function () {
         ->assertSee('Move to Done')
         ->assertDontSee('Move to To do');
 });
+
+it('makes each column a sortable list of tasks', function () {
+    $milestone = Milestone::factory()->create();
+    $tasks = sampleBoard($milestone);
+
+    $html = milestonePage($milestone)->html();
+
+    expect(substr_count($html, 'wire:sort="moveTask"'))->toBe(3);
+
+    foreach ($tasks as $task) {
+        expect($html)->toContain('wire:sort:item="' . $task->id . '"');
+    }
+});
