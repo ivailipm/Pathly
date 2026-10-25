@@ -37,7 +37,7 @@
         </div>
     @endif
 
-    <x-progress-summary
+    <x-progress-segments
         :done="$this->milestones->sum('done_tasks_count')"
         :total="$this->milestones->sum('tasks_count')"
         class="max-w-md"
@@ -48,12 +48,16 @@
 
         @forelse ($this->milestones as $milestone)
             <a href="{{ route('milestones.show', [$subject, $milestone]) }}" wire:navigate wire:key="milestone-{{ $milestone->id }}" class="block">
-                <flux:card class="hover:bg-zinc-50 dark:hover:bg-zinc-700/50">
+                <flux:card class="hover:bg-zinc-50">
                     <flux:heading>{{ $loop->iteration }}. {{ $milestone->title }}</flux:heading>
                     @if ($milestone->description)
                         <flux:text class="mt-1">{{ $milestone->description }}</flux:text>
                     @endif
-                    <x-progress-summary :done="$milestone->done_tasks_count" :total="$milestone->tasks_count" class="mt-3" />
+                    @if ($milestone->tasks_count > 0)
+                        <x-progress-segments :done="$milestone->done_tasks_count" :total="$milestone->tasks_count" class="mt-3 max-w-[360px]" />
+                    @else
+                        <flux:text size="sm" class="mt-3">{{ __('No tasks yet') }}</flux:text>
+                    @endif
                 </flux:card>
             </a>
         @empty
