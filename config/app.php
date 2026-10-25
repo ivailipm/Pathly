@@ -67,6 +67,9 @@ return [
 
     'timezone' => 'UTC',
 
+    // Storage stays UTC; "today", day grouping and displayed times use this zone
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Sofia'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
