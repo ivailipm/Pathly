@@ -1,43 +1,43 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
-        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
+    <body class="min-h-screen bg-paper text-ink antialiased">
+        <flux:sidebar sticky collapsible="mobile" class="border-e border-rule bg-sand">
             <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                <a href="{{ route('dashboard') }}" wire:navigate class="flex min-w-0 items-center gap-2.5 rounded-button px-2 py-1 focus-visible:outline-2 focus-visible:outline-ink">
+                    <span aria-hidden="true" class="flex size-7 shrink-0 items-center justify-center rounded-md bg-ink font-serif text-lg italic text-paper">P</span>
+                    <span class="flex min-w-0 flex-col leading-tight">
+                        <span class="text-sm font-semibold">{{ config('app.name', 'Pathly') }}</span>
+                        <span class="truncate text-xs text-muted">{{ __(":name's library", ['name' => str(auth()->user()->name)->before(' ')]) }}</span>
+                    </span>
+                </a>
+
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
-            <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
-                    <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                        {{ __('Dashboard') }}
-                    </flux:sidebar.item>
-                    <flux:sidebar.item icon="academic-cap" :href="route('subjects.index')" :current="request()->routeIs('subjects.*', 'milestones.*')" wire:navigate>
-                        {{ __('Subjects') }}
-                    </flux:sidebar.item>
-                </flux:sidebar.group>
-            </flux:sidebar.nav>
+            <nav aria-label="{{ __('Main') }}" class="flex flex-col gap-0.5">
+                <x-sidebar-link :href="route('dashboard')" :current="request()->routeIs('dashboard')">
+                    <flux:icon.sun class="size-4" />
+                    {{ __('Today') }}
+                </x-sidebar-link>
+
+                <x-sidebar-link :href="route('subjects.index')" :current="request()->routeIs('subjects.index')">
+                    <flux:icon.book class="size-4" />
+                    {{ __('Library') }}
+                </x-sidebar-link>
+            </nav>
+
+            <x-sidebar-subjects />
 
             <flux:spacer />
-
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
 
         <!-- Mobile User Menu -->
-        <flux:header class="lg:hidden">
+        <flux:header class="border-b border-rule bg-sand lg:hidden">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
 
             <flux:spacer />
