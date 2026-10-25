@@ -6,34 +6,67 @@
 @source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
 @source '../../vendor/livewire/flux/stubs/**/*.blade.php';
 
+/*
+ * Light only. Nothing ever sets the .dark class, so the dark: classes inside Flux's own components never
+ * apply. Without this line Tailwind's default dark variant would follow the OS setting instead.
+ */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-serif: 'Newsreader', Georgia, ui-serif, serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    /* Mono uppercase labels */
+    --tracking-label: 0.08em;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
-}
+    --color-paper: #fbfaf7;
+    --color-sand: #f4f2ec;
+    --color-ink: #191917;
+    --color-body: #3d3c38;
+    --color-secondary: #4a4945;
+    --color-muted: #6b6a64; /* the lowest grey allowed for text */
+    --color-rule: #e6e3dc;
+    --color-control: #e0ddd5;
+    --color-active: #e8e5dd;
+    --color-vermilion: #b8432a; /* only for in progress, now and up next */
+    --color-live: #3e7b4f;
 
-@layer theme {
-    .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
-    }
+    /* Subject tints: background, text, and the shade of the large decorative letter */
+    --color-clay: #ebdcd2;
+    --color-clay-ink: #7a3b22;
+    --color-clay-shade: #dcc6b7;
+    --color-slate: #d9e2e8;
+    --color-slate-ink: #2d4b5f;
+    --color-slate-shade: #c3d1da;
+    --color-moss: #e2e5d3;
+    --color-moss-ink: #4b5320;
+    --color-moss-shade: #d0d5bc;
+    --color-plum: #e7dde7;
+    --color-plum-ink: #5b3a5b;
+    --color-plum-shade: #d8c8d8;
+
+    --radius-card: 12px;
+    --radius-task: 9px;
+    --radius-button: 8px;
+
+    /* Flux components use the zinc scale: warm greys so they sit on paper */
+    --color-zinc-50: #fbfaf7;
+    --color-zinc-100: #f4f2ec;
+    --color-zinc-200: #e6e3dc;
+    --color-zinc-300: #d8d4cb;
+    --color-zinc-400: #a9a69d;
+    --color-zinc-500: #6b6a64;
+    --color-zinc-600: #4a4945;
+    --color-zinc-700: #3d3c38;
+    --color-zinc-800: #262523;
+    --color-zinc-900: #191917;
+    --color-zinc-950: #0e0e0d;
+
+    /* Primary buttons: ink background, paper text */
+    --color-accent: var(--color-ink);
+    --color-accent-content: var(--color-ink);
+    --color-accent-foreground: var(--color-paper);
 }
 
 @layer base {
@@ -43,7 +76,7 @@
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--color-rule, currentColor);
     }
 }
 
@@ -53,6 +86,19 @@
 
 [data-flux-label] {
     @apply  !mb-0 !leading-tight;
+}
+
+/* Breadcrumbs as in the mockups: muted links, the current page in ink */
+[data-flux-breadcrumbs-item] {
+    @apply font-normal;
+}
+
+[data-flux-breadcrumbs-item] > a {
+    @apply text-muted no-underline hover:text-ink;
+}
+
+[data-flux-breadcrumbs-item] > div {
+    @apply text-ink;
 }
 
 input:focus[data-flux-control],

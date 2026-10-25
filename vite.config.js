@@ -13,8 +13,18 @@ export default defineConfig({
             ],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
+                // Headlines, notes and quotes (italic for emphasis)
+                bunny('Newsreader', {
+                    weights: [400, 500],
+                    styles: ['normal', 'italic'],
+                }),
+                // The UI
+                bunny('Geist', {
                     weights: [400, 500, 600],
+                }),
+                // Dates, labels and counts
+                bunny('Geist Mono', {
+                    weights: [400, 500],
                 }),
             ],
         }),
