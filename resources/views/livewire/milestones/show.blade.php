@@ -42,14 +42,19 @@
     @php($taskCount = collect($this->columns)->sum(fn ($column) => $column->count()))
 
     @if ($taskCount > 0)
-        <x-progress-summary :done="$this->columns[TaskStatus::Done->value]->count()" :total="$taskCount" class="max-w-md" />
+        <x-progress-segments
+            :done="$this->columns[TaskStatus::Done->value]->count()"
+            :in-progress="$this->columns[TaskStatus::InProgress->value]->count()"
+            :total="$taskCount"
+            class="max-w-md"
+        />
     @else
         <flux:text>{{ __('No tasks yet. Add a resource or exercise below.') }}</flux:text>
     @endif
 
     <div class="grid gap-4 md:grid-cols-3">
         @foreach (TaskStatus::cases() as $status)
-            <div wire:key="column-{{ $status->value }}" class="space-y-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
+            <div wire:key="column-{{ $status->value }}" class="space-y-3 rounded-xl bg-sand p-3">
                 <div class="flex items-center gap-2">
                     <flux:heading level="2">{{ __($status->label()) }}</flux:heading>
                     <flux:badge size="sm">{{ $this->columns[$status->value]->count() }}</flux:badge>
@@ -70,7 +75,7 @@
                         <div
                             wire:key="task-{{ $task->id }}"
                             wire:sort:item="{{ $task->id }}"
-                            class="flex items-start gap-2 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
+                            class="flex items-start gap-2 rounded-task border border-rule bg-white p-3"
                         >
                             <div wire:sort:handle aria-hidden="true" class="mt-0.5 cursor-grab text-zinc-400 active:cursor-grabbing">
                                 <flux:icon.grip-vertical variant="micro" />
