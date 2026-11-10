@@ -3,12 +3,14 @@
 use App\Livewire\Milestones;
 use App\Livewire\Notes;
 use App\Livewire\Subjects;
+use App\Livewire\Today;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    // Today keeps the starter kit's URL and name: Fortify redirects to `dashboard` after login
+    Route::livewire('dashboard', Today::class)->name('dashboard');
 
     Route::livewire('subjects', Subjects\Index::class)->name('subjects.index');
 
