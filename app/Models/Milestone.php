@@ -69,6 +69,16 @@ class Milestone extends Model
     }
 
     /**
+     * Field notes, newest first.
+     *
+     * @return HasMany<Note, $this>
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(Note::class)->latest()->latest('id');
+    }
+
+    /**
      * R2: add `number`, the milestone's 1-based place among all of its subject's milestones (position, then id).
      * It counts the earlier siblings in a subquery, so it stays right inside a filtered query.
      *

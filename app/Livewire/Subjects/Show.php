@@ -5,6 +5,7 @@ namespace App\Livewire\Subjects;
 use App\Livewire\Forms\MilestoneForm;
 use App\Livewire\Forms\SubjectForm;
 use App\Models\Milestone;
+use App\Models\Note;
 use App\Models\Subject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -111,6 +112,22 @@ class Show extends Component
     public function minutesLogged(): int
     {
         return (int) $this->subject->studySessions()->completed()->sum('minutes');
+    }
+
+    /**
+     * "In the margins": the subject's three newest field notes, each with its numbered milestone.
+     *
+     * @return Collection<int, Note>
+     */
+    #[Computed]
+    public function recentNotes(): Collection
+    {
+        return $this->subject->notes()
+            ->with(['milestone' => fn ($milestones) => $milestones->withNumber()])
+            ->latest('notes.created_at')
+            ->latest('notes.id')
+            ->limit(3)
+            ->get();
     }
 
     #[On('session-logged')]

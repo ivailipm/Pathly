@@ -5,6 +5,7 @@ use App\Enums\SubjectStatus;
 use App\Enums\TaskStatus;
 use App\Livewire\Subjects\Show;
 use App\Models\Milestone;
+use App\Models\Note;
 use App\Models\Subject;
 use App\Models\Task;
 use App\Models\User;
@@ -390,4 +391,35 @@ it('dates finished milestones on the path', function () {
     Livewire::actingAs($subject->user)
         ->test(Show::class, ['subject' => $subject])
         ->assertSee('8 Oct');
+});
+
+// Step E: in the margins
+
+it('shows the three newest notes with milestone numbers', function () {
+    config(['app.display_timezone' => 'Europe/Sofia']);
+    $subject = Subject::factory()->create();
+    $first = Milestone::factory()->for($subject)->create(['position' => 1]);
+    $fourth = Milestone::factory()->for($subject)->create(['position' => 4]);
+    Note::factory()->for($first)->create(['body' => 'Oldest', 'created_at' => '2026-10-10 12:00:00']);
+    Note::factory()->for($first)->create(['body' => 'Third', 'created_at' => '2026-10-14 12:00:00']);
+    Note::factory()->for($fourth)->create(['body' => 'Second', 'created_at' => '2026-10-19 12:00:00']);
+    Note::factory()->for($fourth)->create(['body' => 'Newest', 'created_at' => '2026-10-20 12:00:00']);
+    Note::factory()->create(['body' => 'Another subject']);
+
+    $page = Livewire::actingAs($subject->user)->test(Show::class, ['subject' => $subject]);
+
+    expect($page->instance()->recentNotes->pluck('body')->all())->toBe(['Newest', 'Second', 'Third'])
+        ->and($page->instance()->recentNotes->first()?->milestone->number)->toBe(2);
+
+    $page->assertSeeInOrder(['In the margins', 'Tue 20 Oct', '02', 'Newest', 'Second', 'Third', 'All field notes'])
+        ->assertDontSee('Oldest')
+        ->assertDontSee('Another subject');
+});
+
+it('hides the margins without notes', function () {
+    $subject = Subject::factory()->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertDontSee('In the margins');
 });
