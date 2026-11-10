@@ -1,10 +1,12 @@
 <?php
 
+use App\Enums\TaskStatus;
 use App\Livewire\Subjects\Show;
 use App\Models\Milestone;
 use App\Models\Subject;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 it('shows the subject to its owner', function () {
@@ -162,4 +164,100 @@ it('shows the progress of each milestone and of the whole subject', function () 
     Livewire::actingAs($subject->user)
         ->test(Show::class, ['subject' => $subject])
         ->assertSeeInOrder(['2 of 3 tasks done', '1 of 2 tasks done', '1 of 1 task done']);
+});
+
+// Step B: the path
+
+it('numbers the milestones and finds the current one', function () {
+    $subject = Subject::factory()->create();
+    $first = Milestone::factory()->for($subject)->create(['position' => 1]);
+    Task::factory()->for($first)->done()->create();
+    $second = Milestone::factory()->for($subject)->create(['position' => 2]);
+    Task::factory()->for($second)->create();
+    Milestone::factory()->for($subject)->create(['position' => 3]);
+
+    $page = Livewire::actingAs($subject->user)->test(Show::class, ['subject' => $subject]);
+
+    expect($page->instance()->milestones->pluck('number')->all())->toBe([1, 2, 3])
+        ->and($page->instance()->currentMilestoneId)->toBe($second->id);
+
+    $page->assertSeeInOrder(['01', '02', '03'])->assertSee('Add milestone 04');
+});
+
+it('has no current milestone when every milestone is done', function () {
+    $subject = Subject::factory()->create();
+    Task::factory()->for(Milestone::factory()->for($subject))->done()->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSet('currentMilestoneId', null);
+});
+
+it('counts done milestones', function () {
+    $subject = Subject::factory()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 1]))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 2]))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 3]))->create();
+    Milestone::factory()->for($subject)->create(['position' => 4]);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSet('doneMilestonesCount', 2)
+        ->assertSee('2 of 4 milestones');
+});
+
+it('marks the current milestone as up next until one of its tasks starts', function () {
+    $subject = Subject::factory()->create();
+    $milestone = Milestone::factory()->for($subject)->create();
+    $task = Task::factory()->for($milestone)->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSee('Up next')
+        ->assertDontSee('In progress');
+
+    $task->update(['status' => TaskStatus::InProgress]);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSee('In progress')
+        ->assertDontSee('Up next');
+});
+
+it('closes the add milestone form after adding', function () {
+    $subject = Subject::factory()->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->set('addingMilestone', true)
+        ->set('milestoneForm.title', 'Basics')
+        ->call('addMilestone')
+        ->assertSet('addingMilestone', false);
+});
+
+it('keeps the add milestone form open when the title is missing', function () {
+    $subject = Subject::factory()->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->set('addingMilestone', true)
+        ->call('addMilestone')
+        ->assertHasErrors(['milestoneForm.title' => 'required'])
+        ->assertSet('addingMilestone', true);
+});
+
+it('loads the path without a query per milestone', function () {
+    $one = Subject::factory()->has(Milestone::factory()->has(Task::factory()->count(2)))->create();
+    $three = Subject::factory()->has(Milestone::factory()->count(3)->has(Task::factory()->count(2)))->create();
+
+    DB::enableQueryLog();
+
+    Livewire::actingAs($one->user)->test(Show::class, ['subject' => $one]);
+    $queriesForOne = count(DB::getQueryLog());
+
+    DB::flushQueryLog();
+
+    Livewire::actingAs($three->user)->test(Show::class, ['subject' => $three]);
+
+    expect(count(DB::getQueryLog()))->toBe($queriesForOne);
 });

@@ -1,74 +1,234 @@
-<section class="w-full space-y-8">
-    <flux:link :href="route('subjects.index')" wire:navigate class="text-sm">
-        &larr; {{ __('All subjects') }}
-    </flux:link>
+@php
+    $letter = mb_strtoupper(mb_substr(trim($subject->title), 0, 1));
 
-    @if ($editing)
-        <form wire:submit="update" class="max-w-lg space-y-4">
+    // The cover word: the title up to the first space, without leading non-letters ("Laravel")
+    $coverWord = (string) preg_replace('/^[^\p{L}]+/u', '', (string) str($subject->title)->trim()->before(' '));
+    $coverWord = $coverWord !== '' ? $coverWord : $letter;
+
+    $taskTotal = $this->milestones->sum('tasks_count');
+    $nextNumber = sprintf('%02d', $this->milestones->count() + 1);
+@endphp
+
+<div>
+    <x-page-header>
+        <x-slot:breadcrumbs>
+            <flux:breadcrumbs>
+                <flux:breadcrumbs.item :href="route('subjects.index')" separator="slash" wire:navigate>{{ __('Library') }}</flux:breadcrumbs.item>
+                <flux:breadcrumbs.item separator="slash">{{ $subject->title }}</flux:breadcrumbs.item>
+            </flux:breadcrumbs>
+        </x-slot:breadcrumbs>
+
+        <x-slot:actions>
+            <flux:dropdown align="end">
+                <flux:button icon="ellipsis-horizontal" :aria-label="__('More options')" />
+
+                <flux:menu>
+                    <flux:menu.item icon="pencil" wire:click="edit">{{ __('Edit subject') }}</flux:menu.item>
+                    <flux:menu.item
+                        icon="trash"
+                        variant="danger"
+                        wire:click="delete"
+                        wire:confirm="{{ __('Delete this subject and all its milestones and tasks?') }}"
+                    >
+                        {{ __('Delete subject') }}
+                    </flux:menu.item>
+                </flux:menu>
+            </flux:dropdown>
+        </x-slot:actions>
+    </x-page-header>
+
+    <x-subject-tint
+        :subject="$subject"
+        aria-hidden="true"
+        class="relative h-[200px] overflow-hidden bg-[image:repeating-linear-gradient(0deg,transparent_0_27px,var(--tint-shade)_27px_28px)]"
+    >
+        <span class="absolute right-[6%] -bottom-10 font-serif text-[160px] leading-none whitespace-nowrap italic text-(color:--tint-shade) sm:text-[220px]">{{ $coverWord }}</span>
+    </x-subject-tint>
+
+    <div class="mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-4 pb-24 sm:px-10">
+        <section class="relative -mt-11 flex flex-col gap-[22px]">
+            <div class="flex size-22 items-center justify-center rounded-2xl border border-rule bg-paper shadow-[0_2px_10px_rgba(25,25,23,0.06)]">
+                <x-monogram :subject="$subject" size="lg" />
+            </div>
+
+            <h1 class="font-serif text-[clamp(44px,5.5vw,68px)] leading-[1.02] tracking-[-0.02em] text-balance">{{ $subject->title }}</h1>
+
+            <dl class="grid max-w-[640px] grid-cols-[minmax(110px,160px)_1fr] gap-x-4 gap-y-0.5 text-sm">
+                <dt class="flex min-h-[34px] items-center gap-2 text-muted">
+                    <flux:icon.calendar variant="outline" class="size-[15px]" />
+                    {{ __('Started') }}
+                </dt>
+                <dd class="flex min-h-[34px] items-center">
+                    <x-local-date :value="$subject->created_at" format="D MMMM YYYY" />
+                </dd>
+
+                <dt class="flex min-h-[34px] items-center gap-2 text-muted">
+                    <flux:icon.chart-bar variant="outline" class="size-[15px]" />
+                    {{ __('Progress') }}
+                </dt>
+                <dd class="flex min-h-[34px] items-center gap-3">
+                    @if ($taskTotal > 0)
+                        <x-progress-segments
+                            :done="$this->milestones->sum('done_tasks_count')"
+                            :in-progress="$this->milestones->sum('in_progress_tasks_count')"
+                            :total="$taskTotal"
+                            class="w-full max-w-[200px]"
+                        />
+                        <span class="font-mono text-xs whitespace-nowrap text-muted" aria-hidden="true">{{ $this->milestones->sum('done_tasks_count') }} / {{ $taskTotal }}</span>
+                    @else
+                        <span class="text-muted">{{ __('No tasks yet') }}</span>
+                    @endif
+                </dd>
+            </dl>
+
+            @if (filled($subject->description))
+                <p class="max-w-[680px] font-serif text-[21px] leading-normal text-pretty text-body">{{ $subject->description }}</p>
+            @endif
+        </section>
+
+        <section class="flex flex-wrap gap-14 pt-2">
+            <div class="flex min-w-0 flex-[2_1_520px] flex-col">
+                <div class="flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-ink pb-3.5">
+                    <h2 class="font-serif text-[34px] leading-tight">{{ __('The path') }}</h2>
+
+                    @if ($this->milestones->isNotEmpty())
+                        <x-eyebrow>
+                            {{ trans_choice(':done of :total milestone|:done of :total milestones', $this->milestones->count(), ['done' => $this->doneMilestonesCount, 'total' => $this->milestones->count()]) }}
+                        </x-eyebrow>
+                    @endif
+                </div>
+
+                @if ($this->milestones->isEmpty())
+                    <p class="border-b border-rule py-5 text-secondary">{{ __('No milestones yet. Add the first step below.') }}</p>
+                @else
+                    <ol class="flex flex-col">
+                        @foreach ($this->milestones as $milestone)
+                            @php
+                                $number = sprintf('%02d', $milestone->number);
+                                $taskLabel = trans_choice(':done of :total task done|:done of :total tasks done', $milestone->tasks_count, ['done' => $milestone->done_tasks_count, 'total' => $milestone->tasks_count]);
+                            @endphp
+
+                            @if ($milestone->id === $this->currentMilestoneId)
+                                {{-- The current milestone: the raised card --}}
+                                <li wire:key="milestone-{{ $milestone->id }}" class="-mx-3 my-2 rounded-card border border-rule bg-white shadow-[0_1px_3px_rgba(25,25,23,0.05)] sm:-mx-5">
+                                    <a
+                                        href="{{ route('milestones.show', [$subject, $milestone]) }}"
+                                        wire:navigate
+                                        class="group flex gap-4 rounded-card px-3 py-[22px] text-ink focus-visible:outline-2 focus-visible:outline-ink sm:gap-5 sm:px-5"
+                                    >
+                                        <span class="w-10 flex-none font-serif text-[30px] leading-none text-vermilion sm:w-12">{{ $number }}</span>
+
+                                        <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+                                            <div class="flex flex-col gap-1">
+                                                <span class="font-serif text-[26px] leading-[1.15] group-hover:text-vermilion">{{ $milestone->title }}</span>
+                                                @if (filled($milestone->description))
+                                                    <span class="text-sm text-secondary">{{ $milestone->description }}</span>
+                                                @endif
+                                            </div>
+
+                                            @if ($milestone->tasks_count > 0)
+                                                <div class="flex items-center gap-3">
+                                                    <x-progress-segments
+                                                        :done="$milestone->done_tasks_count"
+                                                        :in-progress="$milestone->in_progress_tasks_count"
+                                                        :total="$milestone->tasks_count"
+                                                        class="max-w-[280px] flex-1"
+                                                    />
+                                                    <span class="font-mono text-xs text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
+                                                </div>
+                                            @else
+                                                <span class="text-sm text-muted">{{ __('No tasks yet') }}</span>
+                                            @endif
+                                        </div>
+
+                                        <span class="self-start font-mono text-xs whitespace-nowrap text-vermilion">
+                                            {{ $milestone->done_tasks_count + $milestone->in_progress_tasks_count > 0 ? __('In progress') : __('Up next') }}
+                                        </span>
+                                    </a>
+                                </li>
+                            @else
+                                <li wire:key="milestone-{{ $milestone->id }}" class="border-b border-rule">
+                                    <a
+                                        href="{{ route('milestones.show', [$subject, $milestone]) }}"
+                                        wire:navigate
+                                        class="group flex gap-4 py-5 focus-visible:outline-2 focus-visible:outline-ink sm:gap-5"
+                                    >
+                                        <span @class([
+                                            'w-10 flex-none font-serif text-[30px] leading-none sm:w-12',
+                                            'text-zinc-400' => $milestone->is_done,
+                                            'text-ink' => ! $milestone->is_done,
+                                        ])>{{ $number }}</span>
+
+                                        <div class="flex min-w-0 flex-1 flex-col gap-1">
+                                            <span @class([
+                                                'text-[17px] font-medium group-hover:text-vermilion',
+                                                'text-muted' => $milestone->is_done,
+                                                'text-ink' => ! $milestone->is_done,
+                                            ])>{{ $milestone->title }}</span>
+                                            @if (filled($milestone->description))
+                                                <span @class(['text-sm', 'text-muted' => $milestone->is_done, 'text-secondary' => ! $milestone->is_done])>{{ $milestone->description }}</span>
+                                            @endif
+                                        </div>
+
+                                        @if ($milestone->is_done)
+                                            <span class="flex items-center gap-1.5 self-start font-mono text-xs whitespace-nowrap text-muted">
+                                                <flux:icon.check variant="micro" class="size-3.5" />
+                                                {{ __('Done') }}
+                                            </span>
+                                        @elseif ($milestone->tasks_count > 0)
+                                            <span class="self-start font-mono text-xs whitespace-nowrap text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
+                                        @else
+                                            <span class="self-start font-mono text-xs whitespace-nowrap text-muted">{{ __('No tasks yet') }}</span>
+                                        @endif
+
+                                        @if ($milestone->tasks_count > 0)
+                                            <span class="sr-only">{{ $taskLabel }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endif
+                        @endforeach
+                    </ol>
+                @endif
+
+                @if ($addingMilestone)
+                    <form wire:submit="addMilestone" class="mt-6 flex flex-col gap-4 rounded-card border border-rule bg-white p-5">
+                        <x-eyebrow>{{ __('Milestone :number', ['number' => $nextNumber]) }}</x-eyebrow>
+                        <flux:input wire:model="milestoneForm.title" :label="__('Title')" required autofocus />
+                        <flux:textarea wire:model="milestoneForm.description" :label="__('Description')" rows="2" />
+
+                        <div class="flex gap-2">
+                            <flux:button type="submit" variant="primary">{{ __('Add milestone') }}</flux:button>
+                            <flux:button type="button" variant="ghost" wire:click="$set('addingMilestone', false)">{{ __('Cancel') }}</flux:button>
+                        </div>
+                    </form>
+                @else
+                    <button
+                        type="button"
+                        wire:click="$set('addingMilestone', true)"
+                        class="flex min-h-13 items-center gap-2.5 self-start rounded-button px-1 text-[15px] text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+                    >
+                        <flux:icon.plus class="size-4" />
+                        {{ __('Add milestone :number', ['number' => $nextNumber]) }}
+                    </button>
+                @endif
+            </div>
+        </section>
+    </div>
+
+    <flux:modal wire:model="editing" @close="cancelEdit" class="w-full max-w-md">
+        <form wire:submit="update" class="space-y-6">
+            <flux:heading size="lg">{{ __('Edit subject') }}</flux:heading>
+
             <flux:input wire:model="form.title" :label="__('Title')" required />
             <flux:textarea wire:model="form.description" :label="__('Description')" rows="3" />
 
-            <div class="flex gap-2">
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                </flux:modal.close>
                 <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
-                <flux:button type="button" wire:click="cancelEdit">{{ __('Cancel') }}</flux:button>
             </div>
         </form>
-    @else
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div>
-                <flux:heading size="xl" level="1">{{ $subject->title }}</flux:heading>
-                @if ($subject->description)
-                    <flux:text class="mt-2">{{ $subject->description }}</flux:text>
-                @endif
-            </div>
-
-            <div class="flex gap-2">
-                <flux:button size="sm" icon="pencil" wire:click="edit">{{ __('Edit') }}</flux:button>
-                <flux:button
-                    size="sm"
-                    variant="danger"
-                    icon="trash"
-                    wire:click="delete"
-                    wire:confirm="{{ __('Delete this subject and all its milestones and tasks?') }}"
-                >
-                    {{ __('Delete') }}
-                </flux:button>
-            </div>
-        </div>
-    @endif
-
-    <x-progress-segments
-        :done="$this->milestones->sum('done_tasks_count')"
-        :total="$this->milestones->sum('tasks_count')"
-        class="max-w-md"
-    />
-
-    <div class="space-y-3">
-        <flux:heading size="lg" level="2">{{ __('Milestones') }}</flux:heading>
-
-        @forelse ($this->milestones as $milestone)
-            <a href="{{ route('milestones.show', [$subject, $milestone]) }}" wire:navigate wire:key="milestone-{{ $milestone->id }}" class="block">
-                <flux:card class="hover:bg-zinc-50">
-                    <flux:heading>{{ $loop->iteration }}. {{ $milestone->title }}</flux:heading>
-                    @if ($milestone->description)
-                        <flux:text class="mt-1">{{ $milestone->description }}</flux:text>
-                    @endif
-                    @if ($milestone->tasks_count > 0)
-                        <x-progress-segments :done="$milestone->done_tasks_count" :total="$milestone->tasks_count" class="mt-3 max-w-[360px]" />
-                    @else
-                        <flux:text size="sm" class="mt-3">{{ __('No tasks yet') }}</flux:text>
-                    @endif
-                </flux:card>
-            </a>
-        @empty
-            <flux:text>{{ __('No milestones yet. Add the first step below.') }}</flux:text>
-        @endforelse
-    </div>
-
-    <form wire:submit="addMilestone" class="max-w-lg space-y-4">
-        <flux:heading size="lg" level="2">{{ __('Add a milestone') }}</flux:heading>
-        <flux:input wire:model="milestoneForm.title" :label="__('Title')" required />
-        <flux:textarea wire:model="milestoneForm.description" :label="__('Description')" rows="2" />
-        <flux:button type="submit" variant="primary" icon="plus">{{ __('Add milestone') }}</flux:button>
-    </form>
-</section>
+    </flux:modal>
+</div>

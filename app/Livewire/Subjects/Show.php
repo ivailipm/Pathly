@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Subjects;
 
-use App\Enums\TaskStatus;
 use App\Livewire\Forms\MilestoneForm;
 use App\Livewire\Forms\SubjectForm;
 use App\Models\Milestone;
@@ -12,6 +11,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
+/**
+ * @property-read Collection<int, Milestone> $milestones
+ */
 class Show extends Component
 {
     public Subject $subject;
@@ -21,6 +23,8 @@ class Show extends Component
     public MilestoneForm $milestoneForm;
 
     public bool $editing = false;
+
+    public bool $addingMilestone = false;
 
     public function mount(): void
     {
@@ -72,17 +76,37 @@ class Show extends Component
         ]);
 
         $this->milestoneForm->reset();
+
+        $this->addingMilestone = false;
     }
 
     /**
+     * The path: every milestone in order, numbered, with its task counts.
+     *
      * @return Collection<int, Milestone>
      */
     #[Computed]
     public function milestones(): Collection
     {
         return $this->subject->milestones()
-            ->withCount(['tasks', 'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done)])
+            ->withNumber()
+            ->withTaskCounts()
             ->get();
+    }
+
+    /**
+     * R4: the first milestone that is not done.
+     */
+    #[Computed]
+    public function currentMilestoneId(): ?int
+    {
+        return $this->milestones->first(fn (Milestone $milestone) => ! $milestone->is_done)?->id;
+    }
+
+    #[Computed]
+    public function doneMilestonesCount(): int
+    {
+        return $this->milestones->filter(fn (Milestone $milestone) => $milestone->is_done)->count();
     }
 
     public function render(): View
