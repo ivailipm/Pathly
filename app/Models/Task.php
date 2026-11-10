@@ -6,10 +6,12 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -23,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read string|null $display_url
+ * @property-read int|null $minutes_logged only when loaded with withMinutesLogged(); null means none
  */
 #[Fillable(['milestone_id', 'title', 'url', 'type', 'status', 'position'])]
 class Task extends Model
@@ -47,6 +50,7 @@ class Task extends Model
         return [
             'status' => TaskStatus::class,
             'type' => TaskType::class,
+            'minutes_logged' => 'integer',
         ];
     }
 
@@ -56,6 +60,24 @@ class Task extends Model
     public function milestone(): BelongsTo
     {
         return $this->belongsTo(Milestone::class);
+    }
+
+    /**
+     * @return HasMany<StudySession, $this>
+     */
+    public function studySessions(): HasMany
+    {
+        return $this->hasMany(StudySession::class);
+    }
+
+    /**
+     * Add minutes_logged: the task's completed session minutes.
+     *
+     * @param  Builder<Task>  $query
+     */
+    public function scopeWithMinutesLogged(Builder $query): void
+    {
+        $query->withSum(['studySessions as minutes_logged' => fn ($sessions) => $sessions->completed()], 'minutes');
     }
 
     /**

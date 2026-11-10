@@ -37,6 +37,8 @@ use Illuminate\Support\Carbon;
  * @property-read Milestone|null $current_milestone
  * @property-read bool $is_started
  * @property-read int|null $target_days_left positive = days left, 0 = due today, negative = days over
+ * @property-read CarbonImmutable|null $last_studied_at only when loaded with withLibraryData()
+ * @property-read int|null $days_since_studied 0 = today, 1 = yesterday, null = never (display timezone)
  */
 #[Fillable(['title', 'description', 'status', 'target_date', 'tags', 'colour'])]
 class Subject extends Model
@@ -69,6 +71,7 @@ class Subject extends Model
             'done_tasks_count' => 'integer',
             'in_progress_tasks_count' => 'integer',
             'milestones_count' => 'integer',
+            'last_studied_at' => 'datetime',
         ];
     }
 
@@ -99,6 +102,16 @@ class Subject extends Model
     }
 
     /**
+     * Sessions by subject_id, so they keep counting after their task is deleted.
+     *
+     * @return HasMany<StudySession, $this>
+     */
+    public function studySessions(): HasMany
+    {
+        return $this->hasMany(StudySession::class);
+    }
+
+    /**
      * Add tasks_count, done_tasks_count and in_progress_tasks_count over all of the subject's milestones.
      *
      * @param  Builder<Subject>  $query
@@ -123,6 +136,7 @@ class Subject extends Model
     {
         $query->withTaskCounts()
             ->withCount('milestones')
+            ->withMax(['studySessions as last_studied_at' => fn ($sessions) => $sessions->completed()], 'started_at')
             ->with(['milestones' => fn ($milestones) => $milestones->withNumber()->withTaskCounts()]);
     }
 
@@ -137,13 +151,31 @@ class Subject extends Model
     }
 
     /**
-     * R7: started once any of its tasks has left To do.
+     * R7: started once any of its tasks has left To do, or a session was logged on it.
      *
      * @return Attribute<bool, never>
      */
     protected function isStarted(): Attribute
     {
-        return Attribute::get(fn (): bool => $this->done_tasks_count + $this->in_progress_tasks_count > 0);
+        return Attribute::get(fn (): bool => $this->done_tasks_count + $this->in_progress_tasks_count > 0
+            || $this->last_studied_at !== null);
+    }
+
+    /**
+     * Whole local days since the last completed session (R1): 0 = today, 1 = yesterday, null = never.
+     *
+     * @return Attribute<int|null, never>
+     */
+    protected function daysSinceStudied(): Attribute
+    {
+        return Attribute::get(function (): ?int {
+            if ($this->last_studied_at === null) {
+                return null;
+            }
+
+            // round(): days around a daylight-saving change are 23 or 25 hours long
+            return (int) round(LocalTime::of($this->last_studied_at)->startOfDay()->diffInDays(LocalTime::today()));
+        });
     }
 
     /**

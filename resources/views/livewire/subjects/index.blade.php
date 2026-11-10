@@ -48,7 +48,9 @@
         @else
             <section class="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-6">
                 @foreach ($this->subjects as $subject)
-                    @php($current = $subject->current_milestone)
+                    @php
+                        $current = $subject->current_milestone;
+                    @endphp
 
                     <a
                         href="{{ route('subjects.show', $subject) }}"
@@ -59,9 +61,21 @@
                         <x-subject-tint :subject="$subject" class="relative flex h-42 items-end overflow-hidden p-4">
                             <span aria-hidden="true" class="absolute -top-6.5 -right-1.5 font-serif text-[180px] leading-none italic text-(color:--tint-shade)">{{ mb_strtoupper(mb_substr(trim($subject->title), 0, 1)) }}</span>
 
-                            @if ($subject->status !== SubjectStatus::Active)
-                                <span class="relative font-mono text-[11px] tracking-label uppercase">{{ __($subject->status->label()) }}</span>
-                            @endif
+                            @php
+                                $studied = match ($subject->days_since_studied) {
+                                    null => __('Not started'),
+                                    0 => __('Studied today'),
+                                    1 => __('Yesterday'),
+                                    default => trans_choice(':count day ago|:count days ago', $subject->days_since_studied),
+                                };
+                            @endphp
+
+                            <span class="relative font-mono text-[11px] tracking-label uppercase">
+                                @if ($subject->status !== SubjectStatus::Active)
+                                    {{ __($subject->status->label()) }} ·
+                                @endif
+                                {{ $studied }}
+                            </span>
                         </x-subject-tint>
 
                         <div class="flex flex-1 flex-col gap-2.5 p-[18px]">

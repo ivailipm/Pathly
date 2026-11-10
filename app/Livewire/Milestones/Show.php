@@ -6,20 +6,31 @@ use App\Enums\TaskStatus;
 use App\Livewire\Forms\MilestoneForm;
 use App\Livewire\Forms\TaskForm;
 use App\Models\Milestone;
+use App\Models\StudySession;
 use App\Models\Subject;
 use App\Models\Task;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
  * @property-read array<string, Collection<int, Task>> $columns
+ * @property-read StudySession|null $runningSession
  */
 class Show extends Component
 {
+    /**
+     * A timer running longer than this is treated as forgotten: discarded, not saved (spec assumption 11).
+     */
+    public const MAX_TIMER_MINUTES = 600;
+
     public Subject $subject;
 
     public Milestone $milestone;
@@ -158,7 +169,15 @@ class Show extends Component
     {
         $this->authorize('update', $this->subject);
 
-        $this->findTask($taskId)->delete();
+        $task = $this->findTask($taskId);
+        $running = $this->runningSession;
+
+        // Keep the time so far: the session stays on the subject after the task is gone
+        if ($running?->task_id === $task->id) {
+            $this->stopSession($running);
+        }
+
+        $task->delete();
 
         // Deleting the last task that wasn't done finishes the milestone; deleting the last task reopens it
         $this->milestone->syncCompletion();
@@ -203,14 +222,81 @@ class Show extends Component
     }
 
     /**
-     * The milestone's tasks as board columns, keyed by status value.
+     * Start a timer on a task. Any other running timer of the user (on any milestone) is stopped first.
+     */
+    public function startTimer(int $taskId): void
+    {
+        $this->authorize('update', $this->subject);
+
+        $task = $this->findTask($taskId);
+
+        Auth::user()->studySessions()->running()->get()
+            ->each(fn (StudySession $session) => $this->stopSession($session));
+
+        Auth::user()->studySessions()->create([
+            'subject_id' => $this->subject->id,
+            'task_id' => $task->id,
+            'started_at' => now(),
+        ]);
+
+        unset($this->runningSession, $this->minutesLogged, $this->columns);
+    }
+
+    /**
+     * Stop the running timer on this milestone and save its minutes.
+     */
+    public function stopTimer(): void
+    {
+        $this->authorize('update', $this->subject);
+
+        $this->stopSession($this->runningSession ?? abort(404));
+
+        unset($this->runningSession, $this->minutesLogged, $this->columns);
+    }
+
+    /**
+     * A session was logged by hand (LogSession): the totals changed.
+     */
+    #[On('session-logged')]
+    public function refreshTotals(): void
+    {
+        unset($this->minutesLogged, $this->columns);
+    }
+
+    /**
+     * The milestone's tasks as board columns, keyed by status value, each with minutes_logged.
      *
      * @return array<string, Collection<int, Task>>
      */
     #[Computed]
     public function columns(): array
     {
-        return $this->toColumns($this->milestone->tasks()->get());
+        return $this->toColumns($this->milestone->tasks()->withMinutesLogged()->get());
+    }
+
+    /**
+     * The user's running timer, when it is on one of this milestone's tasks.
+     */
+    #[Computed]
+    public function runningSession(): ?StudySession
+    {
+        return Auth::user()->studySessions()
+            ->running()
+            ->whereIn('task_id', $this->milestoneTaskIds())
+            ->latest('started_at')
+            ->first();
+    }
+
+    /**
+     * Completed session minutes on this milestone's tasks.
+     */
+    #[Computed]
+    public function minutesLogged(): int
+    {
+        return (int) StudySession::query()
+            ->completed()
+            ->whereIn('task_id', $this->milestoneTaskIds())
+            ->sum('minutes');
     }
 
     /**
@@ -242,6 +328,38 @@ class Show extends Component
     public function render(): View
     {
         return view('livewire.milestones.show')->title($this->milestone->title);
+    }
+
+    /**
+     * Save a running session's minutes (at least 1), or discard it with a toast when it ran past the limit.
+     */
+    private function stopSession(StudySession $session): void
+    {
+        // Carbon 3 returns a signed float
+        $minutes = (int) ceil(abs($session->started_at->diffInSeconds(now())) / 60);
+
+        if ($minutes > self::MAX_TIMER_MINUTES) {
+            $session->delete();
+
+            Flux::toast(
+                text: __("That timer ran over 10 hours, so it wasn't saved. Log the session by hand."),
+                variant: 'warning',
+            );
+
+            return;
+        }
+
+        $session->update(['minutes' => max(1, $minutes)]);
+    }
+
+    /**
+     * A subquery of this milestone's task ids.
+     *
+     * @return Builder<Task>
+     */
+    private function milestoneTaskIds(): Builder
+    {
+        return Task::query()->select('tasks.id')->where('tasks.milestone_id', $this->milestone->id);
     }
 
     /**

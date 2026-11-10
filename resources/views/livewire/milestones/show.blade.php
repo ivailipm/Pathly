@@ -4,6 +4,9 @@
 @php
     $taskCount = collect($this->columns)->sum(fn ($column) => $column->count());
     $doneCount = $this->columns[TaskStatus::Done->value]->count();
+
+    // Read once: Livewire doesn't cache a computed property that returns null, so each read would query again
+    $runningSession = $this->runningSession;
 @endphp
 
 <div>
@@ -18,6 +21,10 @@
 
         <x-slot:actions>
             <flux:button wire:click="edit">{{ __('Edit') }}</flux:button>
+
+            <flux:modal.trigger name="log-session">
+                <flux:button variant="primary" icon="clock">{{ __('Log a session') }}</flux:button>
+            </flux:modal.trigger>
         </x-slot:actions>
     </x-page-header>
 
@@ -50,6 +57,11 @@
                     @else
                         <span class="text-sm">{{ __('No tasks yet. Add a resource or exercise below.') }}</span>
                     @endif
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <x-eyebrow size="sm">{{ __('Time logged') }}</x-eyebrow>
+                    <x-duration :minutes="$this->minutesLogged" class="text-sm" />
                 </div>
 
                 <div class="flex flex-col gap-1.5">
@@ -109,6 +121,9 @@
                                 $isUpNext = $task->id === $this->upNextTaskId;
                                 $typeLabel = $task->type ? __($task->type->label()) : null;
                                 $label = implode(' · ', array_filter([$typeLabel, $isUpNext ? __('Up next') : null]));
+                                $minutes = (int) $task->minutes_logged;
+                                $isRunning = $runningSession?->task_id === $task->id;
+                                $canTime = ! $isDone && ($isUpNext || $task->status === TaskStatus::InProgress);
                             @endphp
 
                             <article
@@ -143,12 +158,18 @@
                                     @endif
 
                                     <div @class(['flex min-w-0 flex-1 flex-col', 'gap-2.5' => ! $isDone, 'gap-0.5' => $isDone])>
-                                        @if (! $isDone && $label !== '')
-                                            <span @class([
-                                                'font-mono text-[11px] tracking-label uppercase',
-                                                'text-vermilion' => $isUpNext,
-                                                'text-muted' => ! $isUpNext,
-                                            ])>{{ $label }}</span>
+                                        @if (! $isDone && ($label !== '' || $minutes > 0))
+                                            <div class="flex items-baseline justify-between gap-2">
+                                                <span @class([
+                                                    'font-mono text-[11px] tracking-label uppercase',
+                                                    'text-vermilion' => $isUpNext,
+                                                    'text-muted' => ! $isUpNext,
+                                                ])>{{ $label }}</span>
+
+                                                @if ($minutes > 0)
+                                                    <x-duration :minutes="$minutes" class="font-mono text-[11px] whitespace-nowrap text-muted" />
+                                                @endif
+                                            </div>
                                         @endif
 
                                         <span @class([
@@ -174,6 +195,36 @@
                                             </a>
                                         @elseif ($isDone && $typeLabel)
                                             <span class="font-mono text-[11px] text-muted">{{ $typeLabel }}</span>
+                                        @endif
+
+                                        @if ($isRunning)
+                                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                                <flux:button size="sm" icon="stop" wire:click="stopTimer" class="min-h-10">{{ __('Stop timer') }}</flux:button>
+
+                                                {{-- Display only: the server works out the minutes when the timer stops --}}
+                                                <span
+                                                    wire:key="clock-{{ $runningSession->id }}"
+                                                    x-data="{
+                                                        start: Date.parse(@js($runningSession->started_at->toIso8601String())),
+                                                        now: Date.now(),
+                                                        tick: null,
+                                                        init() { this.tick = setInterval(() => this.now = Date.now(), 1000) },
+                                                        destroy() { clearInterval(this.tick) },
+                                                        get elapsed() {
+                                                            const seconds = Math.max(0, Math.floor((this.now - this.start) / 1000));
+                                                            return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+                                                        },
+                                                    }"
+                                                    x-text="elapsed"
+                                                    role="timer"
+                                                    aria-label="{{ __('Time on this task') }}"
+                                                    class="font-mono text-xs text-vermilion tabular-nums"
+                                                >00:00</span>
+                                            </div>
+                                        @elseif ($canTime)
+                                            <div class="pt-1">
+                                                <flux:button size="sm" icon="play" wire:click="startTimer({{ $task->id }})" class="min-h-10">{{ __('Start timer') }}</flux:button>
+                                            </div>
                                         @endif
                                     </div>
 
@@ -276,4 +327,6 @@
             </div>
         </form>
     </flux:modal>
+
+    <livewire:sessions.log-session :milestone="$milestone" />
 </div>

@@ -64,7 +64,7 @@
 
             <dl class="grid max-w-[640px] grid-cols-[minmax(110px,160px)_1fr] gap-x-4 gap-y-0.5 text-sm">
                 <dt class="flex min-h-[34px] items-center gap-2 text-muted">
-                    <flux:icon.clock variant="outline" class="size-[15px]" />
+                    <flux:icon.signal variant="outline" class="size-[15px]" />
                     {{ __('Status') }}
                 </dt>
                 <dd class="flex min-h-[34px] items-center">
@@ -110,6 +110,14 @@
                     @else
                         <span class="text-muted">{{ __('No date') }}</span>
                     @endif
+                </dd>
+
+                <dt class="flex min-h-[34px] items-center gap-2 text-muted">
+                    <flux:icon.clock variant="outline" class="size-[15px]" />
+                    {{ __('Time logged') }}
+                </dt>
+                <dd class="flex min-h-[34px] items-center">
+                    <x-duration :minutes="$this->minutesLogged" />
                 </dd>
 
                 <dt class="flex min-h-[34px] items-center gap-2 text-muted">

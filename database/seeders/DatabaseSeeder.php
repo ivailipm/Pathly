@@ -8,6 +8,7 @@ use App\Models\Milestone;
 use App\Models\Subject;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\LocalTime;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -52,6 +53,27 @@ class DatabaseSeeder extends Seeder
 
                 $milestone->syncCompletion();
             }
+        }
+
+        $this->seedSessions($user);
+    }
+
+    /**
+     * About 12 completed sessions over the last 10 days on the first subject, including today and yesterday,
+     * so the week chart, the streak and "Studied today" have something to show.
+     */
+    private function seedSessions(User $user): void
+    {
+        $subject = $user->subjects()->oldest('id')->firstOrFail();
+        $tasks = $subject->tasks()->get();
+
+        foreach ([0, 0, 1, 2, 2, 3, 5, 6, 6, 7, 8, 9] as $daysAgo) {
+            $user->studySessions()->create([
+                'subject_id' => $subject->id,
+                'task_id' => $tasks->random()->id,
+                'started_at' => LocalTime::noonUtc(LocalTime::today()->subDays($daysAgo)->toDateString()),
+                'minutes' => fake()->numberBetween(15, 90),
+            ]);
         }
     }
 }
