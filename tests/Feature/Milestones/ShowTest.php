@@ -6,6 +6,7 @@ use App\Models\Milestone;
 use App\Models\Subject;
 use App\Models\Task;
 use App\Models\User;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -413,4 +414,144 @@ it('makes each column a sortable list of tasks', function () {
     foreach ($tasks as $task) {
         expect($html)->toContain('wire:sort:item="'.$task->id.'"');
     }
+});
+
+// Step B: the redesigned board
+
+it('knows its number and the subject\'s milestone count', function () {
+    $subject = Subject::factory()->create();
+    $milestones = collect(range(1, 4))->map(fn (int $position) => Milestone::factory()->for($subject)->create(['position' => $position]));
+
+    milestonePage($milestones[2])
+        ->assertSet('number', 3)
+        ->assertSet('milestoneCount', 4)
+        ->assertSee('Milestone 03 of 04');
+});
+
+it('picks the first in-progress task as up next', function () {
+    $milestone = Milestone::factory()->create();
+    $tasks = sampleBoard($milestone);
+    Task::factory()->for($milestone)->inProgress()->create(['position' => 5]);
+
+    milestonePage($milestone)->assertSet('upNextTaskId', $tasks['T3']->id);
+});
+
+it('falls back to the first to-do task as up next', function () {
+    $milestone = Milestone::factory()->create();
+    $second = Task::factory()->for($milestone)->create(['position' => 2]);
+    $first = Task::factory()->for($milestone)->create(['position' => 1]);
+    Task::factory()->for($milestone)->done()->create(['position' => 3]);
+
+    milestonePage($milestone)->assertSet('upNextTaskId', $first->id);
+
+    expect($second->id)->not->toBe($first->id);
+});
+
+it('has no up next task when everything is done', function () {
+    $milestone = Milestone::factory()->create();
+    Task::factory()->for($milestone)->done()->create();
+
+    milestonePage($milestone)
+        ->assertSet('upNextTaskId', null)
+        ->assertDontSee('Up next');
+});
+
+it('labels the up next card', function () {
+    $milestone = Milestone::factory()->create();
+    Task::factory()->for($milestone)->create(['title' => 'Read the docs']);
+
+    milestonePage($milestone)->assertSeeInOrder(['Up next', 'Read the docs']);
+});
+
+it('shows a task link without its scheme', function () {
+    $milestone = Milestone::factory()->create();
+    Task::factory()->for($milestone)->create(['url' => 'https://www.laravel.com/docs/reverb/']);
+
+    milestonePage($milestone)
+        ->assertSeeHtml('href="https://www.laravel.com/docs/reverb/"')
+        ->assertSee('laravel.com/docs/reverb');
+});
+
+it('adds a task to the open column', function () {
+    $milestone = Milestone::factory()->create();
+    $tasks = sampleBoard($milestone);
+
+    milestonePage($milestone)
+        ->call('openAddTask', 'in_progress')
+        ->assertSet('addingTo', 'in_progress')
+        ->set('taskForm.title', 'Build a presence channel')
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    $task = $milestone->tasks()->where('title', 'Build a presence channel')->sole();
+
+    expect($task->status)->toBe(TaskStatus::InProgress)
+        ->and($task->position)->toBeGreaterThan($tasks['T3']->position)
+        ->and(milestonePage($milestone)->instance()->columns['in_progress']->last()->id)->toBe($task->id);
+});
+
+it('keeps the add form open for the next task', function () {
+    $milestone = Milestone::factory()->create();
+
+    milestonePage($milestone)
+        ->call('openAddTask', 'done')
+        ->set('taskForm.title', 'First')
+        ->call('addTask')
+        ->assertSet('addingTo', 'done')
+        ->assertSet('taskForm.title', '')
+        ->set('taskForm.title', 'Second')
+        ->call('addTask');
+
+    expect($milestone->tasks()->pluck('status', 'title')->map->value->all())
+        ->toBe(['First' => 'done', 'Second' => 'done']);
+});
+
+it('toggles the add form with the same column', function () {
+    milestonePage(Milestone::factory()->create())
+        ->call('openAddTask', 'todo')
+        ->assertSet('addingTo', 'todo')
+        ->call('openAddTask', 'in_progress')
+        ->assertSet('addingTo', 'in_progress')
+        ->call('openAddTask', 'in_progress')
+        ->assertSet('addingTo', null);
+});
+
+it('clears the add form when it closes', function () {
+    milestonePage(Milestone::factory()->create())
+        ->call('openAddTask', 'todo')
+        ->set('taskForm.title', 'Half typed')
+        ->call('closeAddTask')
+        ->assertSet('addingTo', null)
+        ->assertSet('taskForm.title', '');
+});
+
+it('rejects an unknown column with 422', function () {
+    milestonePage(Milestone::factory()->create())
+        ->call('openAddTask', 'archived')
+        ->assertStatus(422);
+});
+
+it('does not let the browser choose the column', function () {
+    milestonePage(Milestone::factory()->create())
+        ->set('addingTo', 'done');
+})->throws(CannotUpdateLockedPropertyException::class);
+
+it('shows the add form in the open column only', function () {
+    $page = milestonePage(Milestone::factory()->create());
+
+    expect(substr_count($page->html(), 'wire:submit="addTask"'))->toBe(0);
+
+    $page->call('openAddTask', 'in_progress');
+
+    expect(substr_count($page->html(), 'wire:submit="addTask"'))->toBe(1);
+});
+
+it('opens the edit modal with the milestone form', function () {
+    $milestone = Milestone::factory()->create(['title' => 'Reverb']);
+
+    milestonePage($milestone)
+        ->call('edit')
+        ->assertSet('editing', true)
+        ->assertSet('form.title', 'Reverb')
+        ->assertSeeHtml('wire:model.self="editing"');
 });

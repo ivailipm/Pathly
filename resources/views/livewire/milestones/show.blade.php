@@ -1,143 +1,258 @@
 @use('App\Enums\TaskStatus')
 
-<section class="w-full space-y-8">
-    <flux:link :href="route('subjects.show', $subject)" wire:navigate class="text-sm">
-        &larr; {{ $subject->title }}
-    </flux:link>
+@php
+    $taskCount = collect($this->columns)->sum(fn ($column) => $column->count());
+    $doneCount = $this->columns[TaskStatus::Done->value]->count();
+@endphp
 
-    @if ($editing)
-        <form wire:submit="update" class="max-w-lg space-y-4">
+<div>
+    <x-page-header>
+        <x-slot:breadcrumbs>
+            <flux:breadcrumbs>
+                <flux:breadcrumbs.item :href="route('subjects.index')" separator="slash" wire:navigate>{{ __('Library') }}</flux:breadcrumbs.item>
+                <flux:breadcrumbs.item :href="route('subjects.show', $subject)" separator="slash" wire:navigate>{{ $subject->title }}</flux:breadcrumbs.item>
+                <flux:breadcrumbs.item separator="slash">{{ $milestone->title }}</flux:breadcrumbs.item>
+            </flux:breadcrumbs>
+        </x-slot:breadcrumbs>
+
+        <x-slot:actions>
+            <flux:button wire:click="edit">{{ __('Edit') }}</flux:button>
+        </x-slot:actions>
+    </x-page-header>
+
+    <div class="mx-auto flex w-full max-w-[1180px] flex-col gap-9 px-4 pt-12 pb-24 sm:px-10">
+        <section class="flex flex-col gap-4">
+            <x-eyebrow accent>
+                {{ __('Milestone :number of :count', ['number' => sprintf('%02d', $this->number), 'count' => sprintf('%02d', $this->milestoneCount)]) }}
+            </x-eyebrow>
+
+            <h1 class="font-serif text-[clamp(44px,5.5vw,68px)] leading-[1.02] tracking-[-0.02em] text-balance">{{ $milestone->title }}</h1>
+
+            @if (filled($milestone->description))
+                <p class="max-w-[640px] font-serif text-[21px] leading-[1.45] text-pretty text-body">{{ $milestone->description }}</p>
+            @endif
+
+            <div class="flex flex-wrap gap-x-10 gap-y-3 pt-2">
+                <div class="flex flex-col gap-1.5">
+                    <x-eyebrow size="sm">{{ __('Progress') }}</x-eyebrow>
+
+                    @if ($taskCount > 0)
+                        <div class="flex items-center gap-2.5">
+                            <x-progress-segments
+                                :done="$doneCount"
+                                :in-progress="$this->columns[TaskStatus::InProgress->value]->count()"
+                                :total="$taskCount"
+                                class="w-[168px]"
+                            />
+                            <span class="text-sm" aria-hidden="true">{{ __(':done of :total', ['done' => $doneCount, 'total' => $taskCount]) }}</span>
+                        </div>
+                    @else
+                        <span class="text-sm">{{ __('No tasks yet. Add a resource or exercise below.') }}</span>
+                    @endif
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <x-eyebrow size="sm">{{ __('Started') }}</x-eyebrow>
+                    <x-local-date :value="$milestone->created_at" format="D MMMM" class="text-sm" />
+                </div>
+            </div>
+        </section>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-rule">
+            <h2 class="-mb-px flex min-h-11 items-center border-b-2 border-ink text-sm font-medium">{{ __('Board') }}</h2>
+            <span class="text-[13px] text-muted">{{ __('Drag cards between columns') }}</span>
+        </div>
+
+        <section class="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] items-start gap-5" aria-label="{{ __('Board') }}">
+            @foreach (TaskStatus::cases() as $status)
+                @php
+                    $column = $this->columns[$status->value];
+                @endphp
+
+                <div wire:key="column-{{ $status->value }}" class="flex flex-col gap-2.5 rounded-card bg-sand p-3">
+                    <div class="flex min-h-9 items-center justify-between gap-2 ps-1">
+                        <h3 class="flex items-center gap-2 font-mono text-xs tracking-label text-body uppercase">
+                            <span aria-hidden="true" @class([
+                                'size-2 rounded-full',
+                                'border-[1.5px] border-muted' => $status === TaskStatus::Todo,
+                                'bg-vermilion' => $status === TaskStatus::InProgress,
+                                'bg-ink' => $status === TaskStatus::Done,
+                            ])></span>
+                            {{ __($status->label()) }}
+                            <span class="text-muted">{{ $column->count() }}</span>
+                        </h3>
+
+                        <flux:button
+                            variant="ghost"
+                            icon="plus"
+                            wire:click="openAddTask('{{ $status->value }}')"
+                            :aria-label="__('Add task to :column', ['column' => __($status->label())])"
+                            class="text-muted!"
+                        />
+                    </div>
+
+                    @if ($column->isEmpty())
+                        <p class="px-1 text-sm text-muted">{{ __('Nothing here yet') }}</p>
+                    @endif
+
+                    {{-- wire:sort must come first: Livewire stops reading this element's attributes at wire:sort:group --}}
+                    <div
+                        wire:sort="moveTask"
+                        wire:sort:group="tasks"
+                        wire:sort:group-id="{{ $status->value }}"
+                        class="flex min-h-16 flex-col gap-2.5"
+                    >
+                        @foreach ($column as $task)
+                            @php
+                                $isDone = $task->status === TaskStatus::Done;
+                                $isUpNext = $task->id === $this->upNextTaskId;
+                            @endphp
+
+                            <article
+                                wire:key="task-{{ $task->id }}"
+                                wire:sort:item="{{ $task->id }}"
+                                @class([
+                                    'group flex items-start gap-2.5 rounded-task border',
+                                    'border-rule bg-white p-3.5' => ! $isDone,
+                                    'shadow-[0_1px_2px_rgba(25,25,23,0.05)]' => $isUpNext,
+                                    'border-rule/70 bg-paper px-3.5 py-3' => $isDone,
+                                ])
+                            >
+                                @if ($editingTaskId === $task->id)
+                                    <form wire:submit="updateTask" class="min-w-0 flex-1 space-y-3">
+                                        <flux:input wire:model="editTaskForm.title" :label="__('Title')" required />
+                                        <flux:input wire:model="editTaskForm.url" :label="__('Link')" type="url" placeholder="https://" />
+
+                                        <div class="flex gap-2">
+                                            <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
+                                            <flux:button type="button" variant="ghost" wire:click="cancelTaskEdit">{{ __('Cancel') }}</flux:button>
+                                        </div>
+                                    </form>
+                                @else
+                                    @if ($isDone)
+                                        <flux:icon.check variant="micro" class="mt-0.5 size-4 flex-none text-muted" />
+                                    @endif
+
+                                    <div @class(['flex min-w-0 flex-1 flex-col', 'gap-2.5' => ! $isDone, 'gap-0.5' => $isDone])>
+                                        @if ($isUpNext)
+                                            <span class="font-mono text-[11px] tracking-label text-vermilion uppercase">{{ __('Up next') }}</span>
+                                        @endif
+
+                                        <span @class([
+                                            'text-[15px] leading-[1.35] font-medium text-ink' => ! $isDone,
+                                            'text-sm text-muted line-through decoration-zinc-400' => $isDone,
+                                        ])>{{ $task->title }}</span>
+
+                                        @if ($task->url)
+                                            <a
+                                                href="{{ $task->url }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                @class([
+                                                    'flex max-w-full min-w-0 items-center gap-1.5 self-start font-mono text-muted hover:text-ink',
+                                                    'text-xs' => ! $isDone,
+                                                    'text-[11px]' => $isDone,
+                                                ])
+                                            >
+                                                @unless ($isDone)
+                                                    <flux:icon.link variant="micro" class="size-[13px] flex-none" />
+                                                @endunless
+                                                <span class="min-w-0 truncate">{{ $task->display_url }}</span>
+                                            </a>
+                                        @endif
+                                    </div>
+
+                                    <div class="-me-2 -mt-2 flex flex-none items-center">
+                                        <span
+                                            wire:sort:handle
+                                            aria-hidden="true"
+                                            class="flex size-8 cursor-grab items-center justify-center text-zinc-400 group-focus-within:opacity-100 group-hover:opacity-100 active:cursor-grabbing pointer-fine:opacity-0"
+                                        >
+                                            <flux:icon.grip-vertical variant="micro" />
+                                        </span>
+
+                                        <flux:dropdown align="end">
+                                            <flux:button variant="ghost" icon="ellipsis-horizontal" :aria-label="__('Task actions')" class="text-muted!" />
+
+                                            <flux:menu>
+                                                @foreach (TaskStatus::cases() as $other)
+                                                    @continue($other === $status)
+
+                                                    <flux:menu.item wire:click="moveTask({{ $task->id }}, {{ $this->columns[$other->value]->count() }}, '{{ $other->value }}')">
+                                                        {{ __('Move to :status', ['status' => __($other->label())]) }}
+                                                    </flux:menu.item>
+                                                @endforeach
+
+                                                <flux:menu.separator />
+
+                                                <flux:menu.item icon="pencil" wire:click="editTask({{ $task->id }})">{{ __('Edit') }}</flux:menu.item>
+                                                <flux:menu.item
+                                                    icon="trash"
+                                                    variant="danger"
+                                                    wire:click="deleteTask({{ $task->id }})"
+                                                    wire:confirm="{{ __('Delete this task?') }}"
+                                                >
+                                                    {{ __('Delete') }}
+                                                </flux:menu.item>
+                                            </flux:menu>
+                                        </flux:dropdown>
+                                    </div>
+                                @endif
+                            </article>
+                        @endforeach
+                    </div>
+
+                    @if ($addingTo === $status->value)
+                        <form wire:submit="addTask" class="flex flex-col gap-3 rounded-task border border-rule bg-white p-3.5">
+                            <flux:input wire:model="taskForm.title" :label="__('Title')" required autofocus />
+                            <flux:input wire:model="taskForm.url" :label="__('Link (optional)')" type="url" placeholder="https://" />
+
+                            <div class="flex gap-2">
+                                <flux:button type="submit" variant="primary">{{ __('Add') }}</flux:button>
+                                <flux:button type="button" variant="ghost" wire:click="closeAddTask">{{ __('Cancel') }}</flux:button>
+                            </div>
+                        </form>
+                    @elseif ($status === TaskStatus::Todo)
+                        <button
+                            type="button"
+                            wire:click="openAddTask('{{ TaskStatus::Todo->value }}')"
+                            class="flex min-h-10 items-center gap-2 rounded-button px-1.5 text-sm text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+                        >
+                            <flux:icon.plus class="size-[15px]" />
+                            {{ __('Paste a link or add a task') }}
+                        </button>
+                    @endif
+                </div>
+            @endforeach
+        </section>
+    </div>
+
+    <flux:modal wire:model="editing" @close="cancelEdit" class="w-full max-w-md">
+        <form wire:submit="update" class="space-y-6">
+            <flux:heading size="lg">{{ __('Edit milestone') }}</flux:heading>
+
             <flux:input wire:model="form.title" :label="__('Title')" required />
             <flux:textarea wire:model="form.description" :label="__('Description')" rows="3" />
 
-            <div class="flex gap-2">
-                <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
-                <flux:button type="button" wire:click="cancelEdit">{{ __('Cancel') }}</flux:button>
-            </div>
-        </form>
-    @else
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div>
-                <flux:heading size="xl" level="1">{{ $milestone->title }}</flux:heading>
-                @if ($milestone->description)
-                    <flux:text class="mt-2">{{ $milestone->description }}</flux:text>
-                @endif
-            </div>
-
-            <div class="flex gap-2">
-                <flux:button size="sm" icon="pencil" wire:click="edit">{{ __('Edit') }}</flux:button>
+            <div class="flex flex-wrap items-center justify-between gap-2">
                 <flux:button
-                    size="sm"
-                    variant="danger"
+                    type="button"
+                    variant="ghost"
                     icon="trash"
                     wire:click="delete"
                     wire:confirm="{{ __('Delete this milestone and all its tasks?') }}"
+                    class="text-red-700!"
                 >
-                    {{ __('Delete') }}
+                    {{ __('Delete milestone') }}
                 </flux:button>
-            </div>
-        </div>
-    @endif
 
-    @php($taskCount = collect($this->columns)->sum(fn ($column) => $column->count()))
-
-    @if ($taskCount > 0)
-        <x-progress-segments
-            :done="$this->columns[TaskStatus::Done->value]->count()"
-            :in-progress="$this->columns[TaskStatus::InProgress->value]->count()"
-            :total="$taskCount"
-            class="max-w-md"
-        />
-    @else
-        <flux:text>{{ __('No tasks yet. Add a resource or exercise below.') }}</flux:text>
-    @endif
-
-    <div class="grid gap-4 md:grid-cols-3">
-        @foreach (TaskStatus::cases() as $status)
-            <div wire:key="column-{{ $status->value }}" class="space-y-3 rounded-xl bg-sand p-3">
-                <div class="flex items-center gap-2">
-                    <flux:heading level="2">{{ __($status->label()) }}</flux:heading>
-                    <flux:badge size="sm">{{ $this->columns[$status->value]->count() }}</flux:badge>
-                </div>
-
-                @if ($this->columns[$status->value]->isEmpty())
-                    <flux:text size="sm">{{ __('Nothing here yet') }}</flux:text>
-                @endif
-
-                {{-- wire:sort must come first: Livewire stops reading this element's attributes at wire:sort:group --}}
-                <div
-                    wire:sort="moveTask"
-                    wire:sort:group="tasks"
-                    wire:sort:group-id="{{ $status->value }}"
-                    class="min-h-24 space-y-2"
-                >
-                    @foreach ($this->columns[$status->value] as $task)
-                        <div
-                            wire:key="task-{{ $task->id }}"
-                            wire:sort:item="{{ $task->id }}"
-                            class="flex items-start gap-2 rounded-task border border-rule bg-white p-3"
-                        >
-                            <div wire:sort:handle aria-hidden="true" class="mt-0.5 cursor-grab text-zinc-400 active:cursor-grabbing">
-                                <flux:icon.grip-vertical variant="micro" />
-                            </div>
-
-                            @if ($editingTaskId === $task->id)
-                                <form wire:submit="updateTask" class="min-w-0 flex-1 space-y-3">
-                                    <flux:input wire:model="editTaskForm.title" :label="__('Title')" required />
-                                    <flux:input wire:model="editTaskForm.url" :label="__('Link')" type="url" placeholder="https://" />
-
-                                    <div class="flex gap-2">
-                                        <flux:button type="submit" size="sm" variant="primary">{{ __('Save') }}</flux:button>
-                                        <flux:button type="button" size="sm" wire:click="cancelTaskEdit">{{ __('Cancel') }}</flux:button>
-                                    </div>
-                                </form>
-                            @else
-                                <div class="min-w-0 flex-1">
-                                    <span @class(['text-zinc-500 line-through' => $task->status === TaskStatus::Done])>{{ $task->title }}</span>
-                                    @if ($task->url)
-                                        <flux:link :href="$task->url" target="_blank" rel="noopener noreferrer" class="block truncate text-sm">
-                                            {{ $task->url }}
-                                        </flux:link>
-                                    @endif
-                                </div>
-
-                                <flux:dropdown align="end">
-                                    <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" :aria-label="__('Task actions')" />
-
-                                    <flux:menu>
-                                        @foreach (TaskStatus::cases() as $other)
-                                            @continue($other === $status)
-
-                                            <flux:menu.item wire:click="moveTask({{ $task->id }}, {{ $this->columns[$other->value]->count() }}, '{{ $other->value }}')">
-                                                {{ __('Move to :status', ['status' => __($other->label())]) }}
-                                            </flux:menu.item>
-                                        @endforeach
-
-                                        <flux:menu.separator />
-
-                                        <flux:menu.item icon="pencil" wire:click="editTask({{ $task->id }})">{{ __('Edit') }}</flux:menu.item>
-                                        <flux:menu.item
-                                            icon="trash"
-                                            variant="danger"
-                                            wire:click="deleteTask({{ $task->id }})"
-                                            wire:confirm="{{ __('Delete this task?') }}"
-                                        >
-                                            {{ __('Delete') }}
-                                        </flux:menu.item>
-                                    </flux:menu>
-                                </flux:dropdown>
-                            @endif
-                        </div>
-                    @endforeach
+                <div class="flex gap-2">
+                    <flux:modal.close>
+                        <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                    </flux:modal.close>
+                    <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
                 </div>
             </div>
-        @endforeach
-    </div>
-
-    <form wire:submit="addTask" class="max-w-lg space-y-4">
-        <flux:heading size="lg" level="2">{{ __('Add a task') }}</flux:heading>
-        <flux:input wire:model="taskForm.title" :label="__('Title')" required />
-        <flux:input wire:model="taskForm.url" :label="__('Link (optional)')" type="url" placeholder="https://" />
-        <flux:button type="submit" variant="primary" icon="plus">{{ __('Add task') }}</flux:button>
-    </form>
-</section>
+        </form>
+    </flux:modal>
+</div>

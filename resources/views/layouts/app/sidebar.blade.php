@@ -33,6 +33,16 @@
 
             <flux:spacer />
 
+            {{-- ?new=1 opens the Library's New subject modal --}}
+            <a
+                href="{{ route('subjects.index', ['new' => 1]) }}"
+                wire:navigate
+                class="flex min-h-10 items-center gap-2 rounded-button px-2.5 text-sm text-muted hover:bg-active/60 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+            >
+                <flux:icon.plus class="size-4" />
+                {{ __('New subject') }}
+            </a>
+
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
 

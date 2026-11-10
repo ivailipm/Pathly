@@ -79,7 +79,7 @@ it('lists subjects newest first', function () {
 it('shows an empty state when the user has no subjects', function () {
     Livewire::actingAs(User::factory()->create())
         ->test(Index::class)
-        ->assertSee('No subjects yet. Add your first one above.');
+        ->assertSee('No subjects yet. Start your first one.');
 });
 
 it('shows how many tasks of each subject are done', function () {
@@ -123,4 +123,101 @@ it('counts tasks without a query per subject', function () {
     Livewire::actingAs($userWithThree)->test(Index::class);
 
     expect(count(DB::getQueryLog()))->toBe($queriesForOne);
+});
+
+// Step B: the Library
+
+it('exposes milestone counts and the current milestone for each subject', function () {
+    $user = User::factory()->create();
+    $subject = Subject::factory()->for($user)->create();
+    $finished = Milestone::factory()->for($subject)->create(['position' => 1]);
+    Task::factory()->for($finished)->done()->create();
+    $current = Milestone::factory()->for($subject)->create(['position' => 2, 'title' => 'Routing']);
+    Task::factory()->for($current)->create();
+
+    $loaded = Livewire::actingAs($user)->test(Index::class)->instance()->subjects->sole();
+
+    expect($loaded->milestones_count)->toBe(2)
+        ->and($loaded->done_milestones_count)->toBe(1)
+        ->and($loaded->current_milestone?->title)->toBe('Routing')
+        ->and($loaded->current_milestone?->number)->toBe(2)
+        ->and($loaded->is_started)->toBeTrue();
+});
+
+it('adds up the milestones of every subject', function () {
+    $user = User::factory()->create();
+    Subject::factory()->for($user)->has(Milestone::factory()->count(2))->create();
+    Subject::factory()->for($user)->has(Milestone::factory()->count(3))->create();
+    Milestone::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->assertSet('milestoneTotal', 5)
+        ->assertSee('2 subjects')
+        ->assertSee('5 milestones');
+});
+
+it('describes where each subject is on its path', function () {
+    $user = User::factory()->create();
+
+    Subject::factory()->for($user)->create();
+
+    $finished = Subject::factory()->for($user)->create();
+    Task::factory()->for(Milestone::factory()->for($finished))->done()->create();
+
+    $started = Subject::factory()->for($user)->create();
+    Task::factory()->for(Milestone::factory()->for($started)->create(['title' => 'Linear models']))->inProgress()->create();
+
+    $fresh = Subject::factory()->for($user)->create();
+    Task::factory()->for(Milestone::factory()->for($fresh)->create(['title' => 'Scales and axes']))->create();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->assertSee('No milestones yet')
+        ->assertSee('All milestones done')
+        ->assertSeeInOrder(['First up', 'Scales and axes'])
+        ->assertSeeInOrder(['Now on', 'Linear models']);
+});
+
+it('loads library data without a query per subject', function () {
+    $userWithOne = User::factory()->create();
+    $userWithThree = User::factory()->create();
+    Subject::factory()->for($userWithOne)->has(Milestone::factory()->count(2)->has(Task::factory()->count(2)))->create();
+    Subject::factory()->count(3)->for($userWithThree)->has(Milestone::factory()->count(2)->has(Task::factory()->count(2)))->create();
+
+    DB::enableQueryLog();
+
+    Livewire::actingAs($userWithOne)->test(Index::class);
+    $queriesForOne = count(DB::getQueryLog());
+
+    DB::flushQueryLog();
+
+    Livewire::actingAs($userWithThree)->test(Index::class);
+
+    expect(count(DB::getQueryLog()))->toBe($queriesForOne);
+});
+
+it('opens the new subject modal from ?new=1', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->withQueryParams(['new' => 1])
+        ->test(Index::class)
+        ->assertSet('creating', true);
+});
+
+it('closes the modal after saving', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('creating', true)
+        ->set('form.title', 'Spanish to B2')
+        ->call('save')
+        ->assertSet('creating', false);
+});
+
+it('keeps the modal open when the subject is invalid', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('creating', true)
+        ->call('save')
+        ->assertHasErrors(['form.title' => 'required'])
+        ->assertSet('creating', true);
 });
