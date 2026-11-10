@@ -12,8 +12,12 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
+/**
+ * @property-read array<string, Collection<int, Task>> $columns
+ */
 class Show extends Component
 {
     public Subject $subject;
@@ -29,6 +33,13 @@ class Show extends Component
     public bool $editing = false;
 
     public ?int $editingTaskId = null;
+
+    /**
+     * The status value of the column whose add form is open. Only set by openAddTask(), so a tampered
+     * request can't add a task to a column that wasn't opened.
+     */
+    #[Locked]
+    public ?string $addingTo = null;
 
     public function mount(): void
     {
@@ -69,12 +80,43 @@ class Show extends Component
         $this->redirectRoute('subjects.show', ['subject' => $this->subject], navigate: true);
     }
 
+    /**
+     * Open the add form at the bottom of a column; the same column again closes it.
+     */
+    public function openAddTask(string $status): void
+    {
+        $target = TaskStatus::tryFrom($status) ?? abort(422);
+
+        if ($this->addingTo === $target->value) {
+            $this->closeAddTask();
+
+            return;
+        }
+
+        $this->addingTo = $target->value;
+
+        $this->taskForm->reset();
+        $this->resetValidation();
+    }
+
+    public function closeAddTask(): void
+    {
+        $this->addingTo = null;
+
+        $this->taskForm->reset();
+        $this->resetValidation();
+    }
+
+    /**
+     * Add a task last in the open column (To do when none is open). The form stays open for the next one.
+     */
     public function addTask(): void
     {
         $this->authorize('update', $this->subject);
 
         $this->milestone->tasks()->create([
             ...$this->taskForm->validate(),
+            'status' => TaskStatus::tryFrom($this->addingTo ?? '') ?? TaskStatus::Todo,
             // reorder() drops the relation's orderBy, which Postgres rejects in an aggregate
             'position' => (int) $this->milestone->tasks()->reorder()->max('position') + 1,
         ]);
@@ -160,6 +202,32 @@ class Show extends Component
     public function columns(): array
     {
         return $this->toColumns($this->milestone->tasks()->get());
+    }
+
+    /**
+     * R2: this milestone's place in its subject's path.
+     */
+    #[Computed]
+    public function number(): int
+    {
+        // Not value('number'): value() replaces the selected columns and drops the subquery
+        return (int) Milestone::query()->whereKey($this->milestone->id)->withNumber()->first()?->number;
+    }
+
+    #[Computed]
+    public function milestoneCount(): int
+    {
+        return $this->subject->milestones()->reorder()->count();
+    }
+
+    /**
+     * R5: the first In progress task in board order, else the first To do task.
+     */
+    #[Computed]
+    public function upNextTaskId(): ?int
+    {
+        return $this->columns[TaskStatus::InProgress->value]->first()->id
+            ?? $this->columns[TaskStatus::Todo->value]->first()?->id;
     }
 
     public function render(): View

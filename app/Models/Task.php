@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\TaskStatus;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property int $position
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read string|null $display_url
  */
 #[Fillable(['milestone_id', 'title', 'url', 'status', 'position'])]
 class Task extends Model
@@ -51,5 +53,24 @@ class Task extends Model
     public function milestone(): BelongsTo
     {
         return $this->belongsTo(Milestone::class);
+    }
+
+    /**
+     * The link without its scheme, "www." and trailing slash: "laravel.com/docs/reverb".
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function displayUrl(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            if ($this->url === null) {
+                return null;
+            }
+
+            $url = (string) preg_replace('#^https?://#i', '', $this->url);
+            $url = (string) preg_replace('#^www\.#i', '', $url);
+
+            return rtrim($url, '/');
+        });
     }
 }

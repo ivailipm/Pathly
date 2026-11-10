@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\TaskStatus;
 use Database\Factories\SubjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,12 +21,32 @@ use Illuminate\Support\Carbon;
  * @property string|null $description
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read int $tasks_count only when loaded with withTaskCounts()
+ * @property-read int $done_tasks_count
+ * @property-read int $in_progress_tasks_count
+ * @property-read int $milestones_count only when loaded with withLibraryData()
+ * @property-read int $done_milestones_count
+ * @property-read Milestone|null $current_milestone
+ * @property-read bool $is_started
  */
 #[Fillable(['title', 'description'])]
 class Subject extends Model
 {
     /** @use HasFactory<SubjectFactory> */
     use HasFactory;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'tasks_count' => 'integer',
+            'done_tasks_count' => 'integer',
+            'in_progress_tasks_count' => 'integer',
+            'milestones_count' => 'integer',
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>
@@ -34,11 +57,13 @@ class Subject extends Model
     }
 
     /**
+     * Ordered by position, then id (R2), so "the first milestone" is always the same one.
+     *
      * @return HasMany<Milestone, $this>
      */
     public function milestones(): HasMany
     {
-        return $this->hasMany(Milestone::class)->orderBy('position');
+        return $this->hasMany(Milestone::class)->orderBy('position')->orderBy('id');
     }
 
     /**
@@ -47,5 +72,61 @@ class Subject extends Model
     public function tasks(): HasManyThrough
     {
         return $this->hasManyThrough(Task::class, Milestone::class);
+    }
+
+    /**
+     * Add tasks_count, done_tasks_count and in_progress_tasks_count over all of the subject's milestones.
+     *
+     * @param  Builder<Subject>  $query
+     */
+    public function scopeWithTaskCounts(Builder $query): void
+    {
+        $query->withCount([
+            'tasks',
+            'tasks as done_tasks_count' => fn ($tasks) => $tasks->where('tasks.status', TaskStatus::Done),
+            'tasks as in_progress_tasks_count' => fn ($tasks) => $tasks->where('tasks.status', TaskStatus::InProgress),
+        ]);
+    }
+
+    /**
+     * Everything the Library cards need, in a fixed number of queries: task counts, the milestone count,
+     * and the milestones themselves (numbered, with their task counts) for current_milestone and
+     * done_milestones_count.
+     *
+     * @param  Builder<Subject>  $query
+     */
+    public function scopeWithLibraryData(Builder $query): void
+    {
+        $query->withTaskCounts()
+            ->withCount('milestones')
+            ->with(['milestones' => fn ($milestones) => $milestones->withNumber()->withTaskCounts()]);
+    }
+
+    /**
+     * R4: the first milestone that is not done, an empty one included. Reads the eager-loaded milestones.
+     *
+     * @return Attribute<Milestone|null, never>
+     */
+    protected function currentMilestone(): Attribute
+    {
+        return Attribute::get(fn (): ?Milestone => $this->milestones->first(fn (Milestone $milestone) => ! $milestone->is_done));
+    }
+
+    /**
+     * R7: started once any of its tasks has left To do.
+     *
+     * @return Attribute<bool, never>
+     */
+    protected function isStarted(): Attribute
+    {
+        return Attribute::get(fn (): bool => $this->done_tasks_count + $this->in_progress_tasks_count > 0);
+    }
+
+    /**
+     * @return Attribute<int<0, max>, never>
+     */
+    protected function doneMilestonesCount(): Attribute
+    {
+        return Attribute::get(fn (): int => $this->milestones->filter(fn (Milestone $milestone) => $milestone->is_done)->count());
     }
 }

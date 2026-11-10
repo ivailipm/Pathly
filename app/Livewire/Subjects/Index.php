@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Subjects;
 
-use App\Enums\TaskStatus;
 use App\Livewire\Forms\SubjectForm;
 use App\Models\Subject;
 use Illuminate\Contracts\View\View;
@@ -10,12 +9,22 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
-#[Title('Subjects')]
+/**
+ * @property-read Collection<int, Subject> $subjects
+ */
+#[Title('Library')]
 class Index extends Component
 {
     public SubjectForm $form;
+
+    /**
+     * Whether the New subject modal is open. `?new=1` opens it, so the sidebar can link to it.
+     */
+    #[Url(as: 'new')]
+    public bool $creating = false;
 
     /**
      * Create a subject for the current user.
@@ -25,10 +34,12 @@ class Index extends Component
         Auth::user()->subjects()->create($this->form->validate());
 
         $this->form->reset();
+
+        $this->creating = false;
     }
 
     /**
-     * The current user's subjects, newest first, with task counts for the progress bars.
+     * The current user's subjects, newest first, with what the Library cards show.
      *
      * @return Collection<int, Subject>
      */
@@ -36,9 +47,15 @@ class Index extends Component
     public function subjects(): Collection
     {
         return Auth::user()->subjects()
-            ->withCount(['tasks', 'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done)])
+            ->withLibraryData()
             ->latest('id')
             ->get();
+    }
+
+    #[Computed]
+    public function milestoneTotal(): int
+    {
+        return (int) $this->subjects->sum('milestones_count');
     }
 
     public function render(): View
