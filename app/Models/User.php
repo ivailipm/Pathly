@@ -58,6 +58,16 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * Every session the user logged or timed, running ones included.
+     *
+     * @return HasMany<StudySession, $this>
+     */
+    public function studySessions(): HasMany
+    {
+        return $this->hasMany(StudySession::class);
+    }
+
+    /**
      * Get the user's initials
      */
     public function initials(): string

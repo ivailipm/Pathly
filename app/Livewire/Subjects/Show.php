@@ -9,6 +9,7 @@ use App\Models\Subject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -101,6 +102,21 @@ class Show extends Component
     public function currentMilestoneId(): ?int
     {
         return $this->milestones->first(fn (Milestone $milestone) => ! $milestone->is_done)?->id;
+    }
+
+    /**
+     * Completed session minutes on the subject, including sessions whose task was deleted.
+     */
+    #[Computed]
+    public function minutesLogged(): int
+    {
+        return (int) $this->subject->studySessions()->completed()->sum('minutes');
+    }
+
+    #[On('session-logged')]
+    public function refreshTotals(): void
+    {
+        unset($this->minutesLogged);
     }
 
     #[Computed]
