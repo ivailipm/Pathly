@@ -76,3 +76,14 @@ it("names the library after the user's first name", function () {
         ->get(route('dashboard'))
         ->assertSee("Ivayla's library");
 });
+
+it('leaves archived subjects out of the sidebar', function () {
+    $user = User::factory()->create();
+    $active = Subject::factory()->for($user)->create();
+    $paused = Subject::factory()->for($user)->paused()->create();
+    Subject::factory()->for($user)->archived()->create();
+
+    $this->actingAs($user);
+
+    expect((new SidebarSubjects)->subjects->pluck('id')->all())->toBe([$paused->id, $active->id]);
+});

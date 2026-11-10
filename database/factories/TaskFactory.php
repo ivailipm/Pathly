@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Milestone;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,6 +24,7 @@ class TaskFactory extends Factory
             'milestone_id' => Milestone::factory(),
             'title' => fake()->sentence(5),
             'url' => fake()->optional()->url(),
+            'type' => fake()->optional()->randomElement(TaskType::cases()),
             'status' => TaskStatus::Todo,
             'position' => 1,
         ];

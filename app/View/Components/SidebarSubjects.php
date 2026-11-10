@@ -2,6 +2,7 @@
 
 namespace App\View\Components;
 
+use App\Enums\SubjectStatus;
 use App\Models\Subject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,9 +24,11 @@ class SidebarSubjects extends Component
             return;
         }
 
+        // Archived subjects leave the sidebar (R9)
         $this->subjects = $user->subjects()
+            ->where('status', '!=', SubjectStatus::Archived)
             ->latest('id')
-            ->get(['id', 'user_id', 'title']);
+            ->get(['id', 'user_id', 'title', 'colour']);
     }
 
     public function render(): View

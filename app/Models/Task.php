@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -17,12 +18,13 @@ use Illuminate\Support\Carbon;
  * @property string $title
  * @property string|null $url
  * @property TaskStatus $status
+ * @property TaskType|null $type
  * @property int $position
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read string|null $display_url
  */
-#[Fillable(['milestone_id', 'title', 'url', 'status', 'position'])]
+#[Fillable(['milestone_id', 'title', 'url', 'type', 'status', 'position'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -44,6 +46,7 @@ class Task extends Model
     {
         return [
             'status' => TaskStatus::class,
+            'type' => TaskType::class,
         ];
     }
 

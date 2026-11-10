@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\SubjectColour;
+use App\Enums\SubjectStatus;
 use App\Enums\TaskStatus;
 use App\Livewire\Subjects\Show;
 use App\Models\Milestone;
@@ -170,7 +172,7 @@ it('shows the progress of each milestone and of the whole subject', function () 
 
 it('numbers the milestones and finds the current one', function () {
     $subject = Subject::factory()->create();
-    $first = Milestone::factory()->for($subject)->create(['position' => 1]);
+    $first = Milestone::factory()->for($subject)->completed()->create(['position' => 1]);
     Task::factory()->for($first)->done()->create();
     $second = Milestone::factory()->for($subject)->create(['position' => 2]);
     Task::factory()->for($second)->create();
@@ -186,7 +188,7 @@ it('numbers the milestones and finds the current one', function () {
 
 it('has no current milestone when every milestone is done', function () {
     $subject = Subject::factory()->create();
-    Task::factory()->for(Milestone::factory()->for($subject))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->completed())->done()->create();
 
     Livewire::actingAs($subject->user)
         ->test(Show::class, ['subject' => $subject])
@@ -195,8 +197,8 @@ it('has no current milestone when every milestone is done', function () {
 
 it('counts done milestones', function () {
     $subject = Subject::factory()->create();
-    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 1]))->done()->create();
-    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 2]))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->completed()->create(['position' => 1]))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->completed()->create(['position' => 2]))->done()->create();
     Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 3]))->create();
     Milestone::factory()->for($subject)->create(['position' => 4]);
 
@@ -260,4 +262,132 @@ it('loads the path without a query per milestone', function () {
     Livewire::actingAs($three->user)->test(Show::class, ['subject' => $three]);
 
     expect(count(DB::getQueryLog()))->toBe($queriesForOne);
+});
+
+// Step C: subject properties
+
+it('edits status, target date, tags and colour', function () {
+    $subject = Subject::factory()->create(['colour' => SubjectColour::Clay]);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->call('edit')
+        ->assertSet('form.status', 'active')
+        ->assertSet('form.colour', 'clay')
+        ->set('form.status', 'paused')
+        ->set('form.target_date', '2026-12-15')
+        ->set('form.tags', 'Backend, portfolio, backend')
+        ->set('form.colour', 'slate')
+        ->call('update')
+        ->assertHasNoErrors()
+        ->assertSet('editing', false);
+
+    $subject->refresh();
+
+    expect($subject->status)->toBe(SubjectStatus::Paused)
+        ->and($subject->target_date?->toDateString())->toBe('2026-12-15')
+        ->and($subject->tags)->toBe(['backend', 'portfolio'])
+        ->and($subject->colour)->toBe(SubjectColour::Slate);
+});
+
+it('fills the edit form from the subject', function () {
+    $subject = Subject::factory()->paused()->create([
+        'target_date' => '2027-01-31',
+        'tags' => ['maths', 'portfolio'],
+        'colour' => SubjectColour::Moss,
+    ]);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->call('edit')
+        ->assertSet('form.status', 'paused')
+        ->assertSet('form.target_date', '2027-01-31')
+        ->assertSet('form.tags', 'maths, portfolio')
+        ->assertSet('form.colour', 'moss');
+});
+
+it('clears the target date', function () {
+    $subject = Subject::factory()->create(['target_date' => '2026-12-15']);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->call('edit')
+        ->set('form.target_date', '')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($subject->fresh()?->target_date)->toBeNull();
+});
+
+it('validates the subject properties', function () {
+    $subject = Subject::factory()->create();
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->call('edit')
+        ->set('form.status', 'deleted')
+        ->set('form.colour', 'neon')
+        ->set('form.target_date', 'next week')
+        ->set('form.tags', 'a, b, c, d, e, f')
+        ->call('update')
+        ->assertHasErrors(['form.status', 'form.colour', 'form.target_date', 'form.tags']);
+});
+
+it('counts target days left in the display timezone', function () {
+    config(['app.display_timezone' => 'Europe/Sofia']);
+
+    // 22:30 UTC on the 23rd is already the 24th in Sofia
+    $this->travelTo('2026-10-23 22:30:00');
+
+    expect(Subject::factory()->make(['target_date' => '2026-10-25'])->target_days_left)->toBe(1)
+        ->and(Subject::factory()->make(['target_date' => '2026-10-24'])->target_days_left)->toBe(0)
+        ->and(Subject::factory()->make(['target_date' => '2026-10-20'])->target_days_left)->toBe(-4)
+        ->and(Subject::factory()->make(['target_date' => null])->target_days_left)->toBeNull();
+});
+
+it('shows the target date and how far away it is', function (string $target, string $text) {
+    $this->travelTo('2026-10-23 10:00:00');
+    $subject = Subject::factory()->create(['target_date' => $target]);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSee($text);
+})->with([
+    ['2026-12-15', '53 days left'],
+    ['2026-10-24', '1 day left'],
+    ['2026-10-23', 'Due today'],
+    ['2026-10-20', '3 days over'],
+]);
+
+it('shows the status, tags and a missing target date', function () {
+    $subject = Subject::factory()->paused()->create(['tags' => ['backend', 'portfolio'], 'target_date' => null]);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSee('Paused')
+        ->assertSee('backend')
+        ->assertSee('portfolio')
+        ->assertSee('No date');
+});
+
+it('hides the tags row without tags', function () {
+    $tagged = Subject::factory()->create(['tags' => ['maths']]);
+    $untagged = Subject::factory()->create(['tags' => []]);
+
+    // "Tags" is also the edit modal's field label, which is always in the page
+    $mentions = fn (Subject $subject) => substr_count(
+        Livewire::actingAs($subject->user)->test(Show::class, ['subject' => $subject])->html(),
+        'Tags',
+    );
+
+    expect($mentions($tagged))->toBe($mentions($untagged) + 1);
+});
+
+it('dates finished milestones on the path', function () {
+    $subject = Subject::factory()->create();
+    Milestone::factory()->for($subject)->create(['completed_at' => '2026-10-08 10:00:00']);
+
+    Livewire::actingAs($subject->user)
+        ->test(Show::class, ['subject' => $subject])
+        ->assertSee('8 Oct');
 });

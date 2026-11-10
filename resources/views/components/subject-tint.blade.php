@@ -4,8 +4,8 @@
 ])
 
 @php
-    // R8, and the only place that knows how a subject maps to its tint. Step C reads $subject->colour here instead.
-    $tint = ['clay', 'slate', 'moss', 'plum'][($subject->id - 1) % 4];
+    // The only place that knows how a subject maps to its tint
+    $tint = $subject->colour->value;
 
     // Written out in full so Tailwind compiles them. Children draw large decorative letters and
     // ruled lines in the shade with text-(color:--tint-shade).

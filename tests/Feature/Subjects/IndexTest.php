@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\SubjectColour;
 use App\Livewire\Subjects\Index;
 use App\Models\Milestone;
 use App\Models\Subject;
@@ -130,7 +131,7 @@ it('counts tasks without a query per subject', function () {
 it('exposes milestone counts and the current milestone for each subject', function () {
     $user = User::factory()->create();
     $subject = Subject::factory()->for($user)->create();
-    $finished = Milestone::factory()->for($subject)->create(['position' => 1]);
+    $finished = Milestone::factory()->for($subject)->completed()->create(['position' => 1]);
     Task::factory()->for($finished)->done()->create();
     $current = Milestone::factory()->for($subject)->create(['position' => 2, 'title' => 'Routing']);
     Task::factory()->for($current)->create();
@@ -163,7 +164,7 @@ it('describes where each subject is on its path', function () {
     Subject::factory()->for($user)->create();
 
     $finished = Subject::factory()->for($user)->create();
-    Task::factory()->for(Milestone::factory()->for($finished))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($finished)->completed())->done()->create();
 
     $started = Subject::factory()->for($user)->create();
     Task::factory()->for(Milestone::factory()->for($started)->create(['title' => 'Linear models']))->inProgress()->create();
@@ -220,4 +221,181 @@ it('keeps the modal open when the subject is invalid', function () {
         ->call('save')
         ->assertHasErrors(['form.title' => 'required'])
         ->assertSet('creating', true);
+});
+
+// Step C: views, archive, recently finished, colours
+
+it('lists non-archived subjects in gallery and table views', function (string $view) {
+    $user = User::factory()->create();
+    Subject::factory()->for($user)->create(['title' => 'Active one']);
+    Subject::factory()->for($user)->paused()->create(['title' => 'Paused one']);
+    Subject::factory()->for($user)->archived()->create(['title' => 'Archived one']);
+
+    $page = Livewire::actingAs($user)->withQueryParams(['view' => $view])->test(Index::class);
+
+    expect($page->instance()->subjects->pluck('title')->all())->toBe(['Paused one', 'Active one']);
+
+    $page->assertSee('Active one')->assertSee('Paused one')->assertDontSee('Archived one');
+})->with(['gallery', 'table']);
+
+it('lists only archived subjects in the archive view', function () {
+    $user = User::factory()->create();
+    Subject::factory()->for($user)->create(['title' => 'Active one']);
+    Subject::factory()->for($user)->archived()->create(['title' => 'Archived one']);
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->set('view', 'archive')
+        ->assertSee('Archived one')
+        ->assertDontSee('Active one')
+        ->assertDontSee('Start a new subject');
+});
+
+it('says when the archive is empty', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('view', 'archive')
+        ->assertSee('No archived subjects.');
+});
+
+it('falls back to the gallery for an unknown view', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->withQueryParams(['view' => 'kanban'])
+        ->test(Index::class)
+        ->assertSet('view', 'gallery')
+        ->set('view', 'nonsense')
+        ->assertSet('view', 'gallery');
+});
+
+it('marks the selected view as pressed', function () {
+    $html = Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('view', 'table')
+        ->html();
+
+    expect($html)->toMatch('#aria-pressed="true"[^>]*>\s*Table#')
+        ->toMatch('#aria-pressed="false"[^>]*>\s*Gallery#');
+});
+
+it('shows the current milestone and target date in the table', function () {
+    $user = User::factory()->create();
+    $dated = Subject::factory()->for($user)->create(['title' => 'Laravel', 'target_date' => '2026-12-15']);
+    Milestone::factory()->for($dated)->completed()->create(['position' => 1]);
+    Milestone::factory()->for($dated)->create(['position' => 2, 'title' => 'Real-time with Reverb']);
+    Subject::factory()->for($user)->create(['title' => 'Spanish']);
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->set('view', 'table')
+        ->assertSee('02 · Real-time with Reverb')
+        ->assertSee('15 Dec')
+        ->assertSee('No date')
+        ->assertSee('1/2');
+});
+
+it('lists this month\'s finished milestones newest first', function () {
+    $this->travelTo('2026-10-20 12:00:00');
+    $user = User::factory()->create();
+    $subject = Subject::factory()->for($user)->create();
+    Milestone::factory()->for($subject)->create(['title' => 'Older', 'completed_at' => '2026-10-03 09:00:00']);
+    Milestone::factory()->for($subject)->create(['title' => 'Newer', 'completed_at' => '2026-10-14 09:00:00']);
+    Milestone::factory()->for($subject)->create(['title' => 'Last month', 'completed_at' => '2026-09-28 09:00:00']);
+    Milestone::factory()->for($subject)->create(['title' => 'Open']);
+    Milestone::factory()->completed()->create(['title' => 'Someone else']);
+
+    $page = Livewire::actingAs($user)->test(Index::class);
+
+    expect($page->instance()->recentlyFinished->pluck('title')->all())->toBe(['Newer', 'Older']);
+
+    $page->assertSee('Recently finished')->assertSeeInOrder(['Newer', '14 Oct', 'Older', '3 Oct']);
+});
+
+it('starts the month at local midnight', function () {
+    // 1 November 01:30 in Sofia is still 31 October in UTC
+    $this->travelTo('2026-11-05 12:00:00');
+    $user = User::factory()->create();
+    $subject = Subject::factory()->for($user)->create();
+    Milestone::factory()->for($subject)->create(['title' => 'Just after midnight', 'completed_at' => '2026-10-31 23:30:00']);
+    Milestone::factory()->for($subject)->create(['title' => 'Before midnight', 'completed_at' => '2026-10-31 21:30:00']);
+
+    $finished = Livewire::actingAs($user)->test(Index::class)->instance()->recentlyFinished;
+
+    expect($finished->pluck('title')->all())->toBe(['Just after midnight']);
+});
+
+it('leaves archived subjects out of recently finished', function () {
+    $user = User::factory()->create();
+    Milestone::factory()->for(Subject::factory()->for($user)->archived())->completed()->create(['title' => 'Archived work']);
+
+    $page = Livewire::actingAs($user)->test(Index::class);
+
+    expect($page->instance()->recentlyFinished)->toBeEmpty();
+
+    $page->assertDontSee('Recently finished');
+});
+
+it('numbers recently finished milestones within their subject', function () {
+    $user = User::factory()->create();
+    $subject = Subject::factory()->for($user)->create(['title' => 'Laravel']);
+
+    foreach (range(1, 6) as $position) {
+        Milestone::factory()->for($subject)->create([
+            'position' => $position,
+            'completed_at' => $position === 4 ? now() : null,
+        ]);
+    }
+
+    $page = Livewire::actingAs($user)->test(Index::class);
+
+    expect($page->instance()->recentlyFinished->sole()->number)->toBe(4);
+
+    $page->assertSee('Laravel · 04');
+});
+
+it('defaults a new subject\'s colour to the next in rotation', function () {
+    $user = User::factory()->create();
+    Subject::factory()->for($user)->create();
+    Subject::factory()->for($user)->archived()->create();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->assertSet('form.colour', 'moss')
+        ->set('form.title', 'Data viz')
+        ->call('save')
+        ->assertSet('form.colour', 'plum');
+
+    expect(Subject::query()->where('title', 'Data viz')->sole()->colour)->toBe(SubjectColour::Moss);
+});
+
+it('creates a subject with the chosen colour', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->set('form.title', 'Spanish')
+        ->set('form.colour', 'plum')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $subject = $user->subjects()->sole();
+
+    expect($subject->colour)->toBe(SubjectColour::Plum)
+        ->and($subject->status->value)->toBe('active')
+        ->and($subject->tags)->toBe([]);
+});
+
+it('rejects an unknown colour', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('form.title', 'Spanish')
+        ->set('form.colour', 'neon')
+        ->call('save')
+        ->assertHasErrors(['form.colour']);
+});
+
+it('shows paused subjects with their status on the card', function () {
+    $user = User::factory()->create();
+    Subject::factory()->for($user)->paused()->create();
+
+    Livewire::actingAs($user)->test(Index::class)->assertSee('Paused');
 });
