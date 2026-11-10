@@ -27,6 +27,11 @@
                     <flux:icon.book class="size-4" />
                     {{ __('Library') }}
                 </x-sidebar-link>
+
+                <x-sidebar-link :href="route('notes.index')" :current="request()->routeIs('notes.index')">
+                    <flux:icon.pencil class="size-4" />
+                    {{ __('Field notes') }}
+                </x-sidebar-link>
             </nav>
 
             <x-sidebar-subjects />

@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Milestones;
+use App\Livewire\Notes;
 use App\Livewire\Subjects;
 use Illuminate\Support\Facades\Route;
 
@@ -10,6 +11,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
 
     Route::livewire('subjects', Subjects\Index::class)->name('subjects.index');
+
+    Route::livewire('notes', Notes\Index::class)->name('notes.index');
 
     // Other users' subjects answer 404 (SubjectPolicy denies as not found)
     Route::livewire('subjects/{subject}', Subjects\Show::class)

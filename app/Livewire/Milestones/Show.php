@@ -4,8 +4,10 @@ namespace App\Livewire\Milestones;
 
 use App\Enums\TaskStatus;
 use App\Livewire\Forms\MilestoneForm;
+use App\Livewire\Forms\NoteForm;
 use App\Livewire\Forms\TaskForm;
 use App\Models\Milestone;
+use App\Models\Note;
 use App\Models\StudySession;
 use App\Models\Subject;
 use App\Models\Task;
@@ -23,6 +25,7 @@ use Livewire\Component;
 /**
  * @property-read array<string, Collection<int, Task>> $columns
  * @property-read StudySession|null $runningSession
+ * @property-read int|null $upNextTaskId
  */
 class Show extends Component
 {
@@ -41,6 +44,8 @@ class Show extends Component
 
     public TaskForm $editTaskForm;
 
+    public NoteForm $noteForm;
+
     public bool $editing = false;
 
     public ?int $editingTaskId = null;
@@ -56,6 +61,8 @@ class Show extends Component
     {
         // The route's `can` middleware covers real requests; this also covers Livewire::test()
         $this->authorize('view', $this->subject);
+
+        $this->noteForm->task_id = $this->defaultNoteTaskId();
     }
 
     public function edit(): void
@@ -255,12 +262,49 @@ class Show extends Component
     }
 
     /**
+     * Add a field note, linked to a task of this milestone or to none.
+     */
+    public function addNote(): void
+    {
+        $this->authorize('update', $this->subject);
+
+        $data = $this->noteForm->validate();
+
+        if ($data['task_id'] !== null) {
+            // 404 for a task outside this milestone
+            $this->findTask($data['task_id']);
+        }
+
+        $this->milestone->notes()->create($data);
+
+        $this->noteForm->reset();
+        $this->noteForm->task_id = $this->defaultNoteTaskId();
+
+        unset($this->notes);
+    }
+
+    /**
      * A session was logged by hand (LogSession): the totals changed.
      */
     #[On('session-logged')]
     public function refreshTotals(): void
     {
-        unset($this->minutesLogged, $this->columns);
+        unset($this->minutesLogged, $this->columns, $this->notes);
+    }
+
+    /**
+     * The milestone's field notes, newest first, each with its task and that day's minutes on it.
+     *
+     * @return Collection<int, Note>
+     */
+    #[Computed]
+    public function notes(): Collection
+    {
+        $notes = $this->milestone->notes()->with('task')->get();
+
+        Note::attachMinutes($notes);
+
+        return $notes;
     }
 
     /**
@@ -328,6 +372,14 @@ class Show extends Component
     public function render(): View
     {
         return view('livewire.milestones.show')->title($this->milestone->title);
+    }
+
+    /**
+     * A new note links to the task being timed, else to the up next task.
+     */
+    private function defaultNoteTaskId(): ?int
+    {
+        return $this->runningSession->task_id ?? $this->upNextTaskId;
     }
 
     /**

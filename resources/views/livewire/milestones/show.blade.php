@@ -297,6 +297,50 @@
                 </div>
             @endforeach
         </section>
+
+        <section class="mt-6 flex flex-wrap gap-12 border-t-2 border-ink pt-8" aria-labelledby="field-notes-heading">
+            <div class="flex flex-[1_1_240px] flex-col gap-2.5">
+                <h2 id="field-notes-heading" class="font-serif text-[34px] leading-[1.1]">{{ __('Field notes') }}</h2>
+                <p class="max-w-[260px] text-sm text-secondary">{{ __('What clicked, what didn\'t, and what to try next. Three lines after each session is plenty.') }}</p>
+            </div>
+
+            <div class="flex min-w-0 flex-[3_1_520px] flex-col">
+                <form wire:submit="addNote" class="flex flex-col gap-2.5 rounded-card border border-rule bg-white p-[18px] focus-within:border-ink">
+                    <label for="note-body" class="font-mono text-[11px] tracking-label text-muted uppercase">
+                        {{ __('Today') }} · <x-local-date :value="now()" format="ddd D MMM" />
+                    </label>
+
+                    <textarea
+                        id="note-body"
+                        wire:model="noteForm.body"
+                        rows="3"
+                        placeholder="{{ __('What did you learn this session?') }}"
+                        class="resize-y border-0 bg-transparent p-0 font-serif text-[19px] leading-[1.45] text-ink outline-none placeholder:text-muted"
+                    ></textarea>
+
+                    @error('noteForm.body')
+                        <p class="text-sm text-red-700">{{ $message }}</p>
+                    @enderror
+
+                    <div class="flex flex-wrap items-end justify-between gap-2.5">
+                        <flux:select wire:model="noteForm.task_id" :label="__('Linked to')" class="max-w-xs">
+                            <flux:select.option value="">{{ __('Not linked') }}</flux:select.option>
+                            @foreach (collect($this->columns)->flatten(1) as $task)
+                                <flux:select.option :value="$task->id" wire:key="note-task-{{ $task->id }}">{{ $task->title }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+
+                        <flux:button type="submit" variant="primary">{{ __('Add note') }}</flux:button>
+                    </div>
+                </form>
+
+                @forelse ($this->notes as $note)
+                    <x-note-row :note="$note" wire:key="note-{{ $note->id }}" />
+                @empty
+                    <p class="py-7 text-sm text-muted">{{ __('No notes on this milestone yet.') }}</p>
+                @endforelse
+            </div>
+        </section>
     </div>
 
     <flux:modal wire:model="editing" @close="cancelEdit" class="w-full max-w-md">

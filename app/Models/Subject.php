@@ -102,6 +102,14 @@ class Subject extends Model
     }
 
     /**
+     * @return HasManyThrough<Note, Milestone, $this>
+     */
+    public function notes(): HasManyThrough
+    {
+        return $this->hasManyThrough(Note::class, Milestone::class);
+    }
+
+    /**
      * Sessions by subject_id, so they keep counting after their task is deleted.
      *
      * @return HasMany<StudySession, $this>
