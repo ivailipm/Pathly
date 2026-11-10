@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\TaskStatus;
+use Carbon\CarbonImmutable;
 use Database\Factories\MilestoneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\DB;
  * @property string $title
  * @property string|null $description
  * @property int $position
+ * @property CarbonImmutable|null $completed_at set by syncCompletion(), not fillable
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read int $number only when loaded with withNumber()
@@ -41,6 +43,7 @@ class Milestone extends Model
     protected function casts(): array
     {
         return [
+            'completed_at' => 'datetime',
             // Counts come back as different types on SQLite and Postgres
             'number' => 'integer',
             'tasks_count' => 'integer',
@@ -100,12 +103,32 @@ class Milestone extends Model
     }
 
     /**
-     * R3: done when it has tasks and every one is done (needs withTaskCounts()). An empty milestone is never done.
+     * R6: record when the milestone was finished. Sets completed_at when it has tasks and all are done (keeping an
+     * earlier date), and clears it as soon as one task isn't done or no tasks are left. Called after every status
+     * change on the board, not in factories or seeders.
+     */
+    public function syncCompletion(): void
+    {
+        // reorder() drops the relation's orderBy, which Postgres rejects in an aggregate
+        $total = $this->tasks()->reorder()->count();
+        $done = $this->tasks()->reorder()->where('status', TaskStatus::Done)->count();
+
+        if ($total > 0 && $done === $total) {
+            $this->completed_at ??= now();
+        } else {
+            $this->completed_at = null;
+        }
+
+        $this->save();
+    }
+
+    /**
+     * R3: done once it has a completion date (R6). An empty milestone is never done.
      *
      * @return Attribute<bool, never>
      */
     protected function isDone(): Attribute
     {
-        return Attribute::get(fn (): bool => $this->tasks_count > 0 && $this->done_tasks_count === $this->tasks_count);
+        return Attribute::get(fn (): bool => $this->completed_at !== null);
     }
 }

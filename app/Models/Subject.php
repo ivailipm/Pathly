@@ -2,7 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\SubjectColour;
+use App\Enums\SubjectStatus;
 use App\Enums\TaskStatus;
+use App\Support\LocalTime;
+use Carbon\CarbonImmutable;
 use Database\Factories\SubjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +23,10 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property string $title
  * @property string|null $description
+ * @property SubjectStatus $status
+ * @property CarbonImmutable|null $target_date a date, never converted between timezones (R1)
+ * @property list<string> $tags
+ * @property SubjectColour $colour
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read int $tasks_count only when loaded with withTaskCounts()
@@ -28,12 +36,24 @@ use Illuminate\Support\Carbon;
  * @property-read int $done_milestones_count
  * @property-read Milestone|null $current_milestone
  * @property-read bool $is_started
+ * @property-read int|null $target_days_left positive = days left, 0 = due today, negative = days over
  */
-#[Fillable(['title', 'description'])]
+#[Fillable(['title', 'description', 'status', 'target_date', 'tags', 'colour'])]
 class Subject extends Model
 {
     /** @use HasFactory<SubjectFactory> */
     use HasFactory;
+
+    /**
+     * Default values for new subjects, matching the database defaults.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'active',
+        'tags' => '[]',
+        'colour' => 'clay',
+    ];
 
     /**
      * @return array<string, string>
@@ -41,6 +61,10 @@ class Subject extends Model
     protected function casts(): array
     {
         return [
+            'status' => SubjectStatus::class,
+            'target_date' => 'date',
+            'tags' => 'array',
+            'colour' => SubjectColour::class,
             'tasks_count' => 'integer',
             'done_tasks_count' => 'integer',
             'in_progress_tasks_count' => 'integer',
@@ -120,6 +144,25 @@ class Subject extends Model
     protected function isStarted(): Attribute
     {
         return Attribute::get(fn (): bool => $this->done_tasks_count + $this->in_progress_tasks_count > 0);
+    }
+
+    /**
+     * Days until the target date in the display timezone (R1). The date itself is compared as stored.
+     *
+     * @return Attribute<int|null, never>
+     */
+    protected function targetDaysLeft(): Attribute
+    {
+        return Attribute::get(function (): ?int {
+            if ($this->target_date === null) {
+                return null;
+            }
+
+            $target = CarbonImmutable::parse($this->target_date->toDateString(), LocalTime::zone());
+
+            // Carbon 3 returns a signed float
+            return (int) round(LocalTime::today()->diffInDays($target, false));
+        });
     }
 
     /**

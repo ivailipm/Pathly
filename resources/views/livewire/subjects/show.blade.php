@@ -1,9 +1,18 @@
+@use('App\Enums\SubjectStatus')
+
 @php
     $letter = mb_strtoupper(mb_substr(trim($subject->title), 0, 1));
 
     // The cover word: the title up to the first space, without leading non-letters ("Laravel")
     $coverWord = (string) preg_replace('/^[^\p{L}]+/u', '', (string) str($subject->title)->trim()->before(' '));
     $coverWord = $coverWord !== '' ? $coverWord : $letter;
+
+    // Long words get a smaller size so more of them shows; the band still clips what doesn't fit
+    $coverSize = match (true) {
+        mb_strlen($coverWord) <= 7 => 'text-[160px] sm:text-[220px]',
+        mb_strlen($coverWord) <= 10 => 'text-[130px] sm:text-[170px]',
+        default => 'text-[110px] sm:text-[130px]',
+    };
 
     $taskTotal = $this->milestones->sum('tasks_count');
     $nextNumber = sprintf('%02d', $this->milestones->count() + 1);
@@ -42,7 +51,7 @@
         aria-hidden="true"
         class="relative h-[200px] overflow-hidden bg-[image:repeating-linear-gradient(0deg,transparent_0_27px,var(--tint-shade)_27px_28px)]"
     >
-        <span class="absolute right-[6%] -bottom-10 font-serif text-[160px] leading-none whitespace-nowrap italic text-(color:--tint-shade) sm:text-[220px]">{{ $coverWord }}</span>
+        <span class="absolute right-[6%] -bottom-[0.18em] font-serif leading-none whitespace-nowrap italic text-(color:--tint-shade) {{ $coverSize }}">{{ $coverWord }}</span>
     </x-subject-tint>
 
     <div class="mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-4 pb-24 sm:px-10">
@@ -55,11 +64,52 @@
 
             <dl class="grid max-w-[640px] grid-cols-[minmax(110px,160px)_1fr] gap-x-4 gap-y-0.5 text-sm">
                 <dt class="flex min-h-[34px] items-center gap-2 text-muted">
+                    <flux:icon.clock variant="outline" class="size-[15px]" />
+                    {{ __('Status') }}
+                </dt>
+                <dd class="flex min-h-[34px] items-center">
+                    <span @class([
+                        'flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[13px] font-medium',
+                        'bg-vermilion/10 text-vermilion' => $subject->status === SubjectStatus::Active,
+                        'bg-active text-muted' => $subject->status !== SubjectStatus::Active,
+                    ])>
+                        <span aria-hidden="true" @class([
+                            'size-1.5 rounded-full',
+                            'bg-vermilion' => $subject->status === SubjectStatus::Active,
+                            'bg-muted' => $subject->status !== SubjectStatus::Active,
+                        ])></span>
+                        {{ __($subject->status->label()) }}
+                    </span>
+                </dd>
+
+                <dt class="flex min-h-[34px] items-center gap-2 text-muted">
                     <flux:icon.calendar variant="outline" class="size-[15px]" />
                     {{ __('Started') }}
                 </dt>
                 <dd class="flex min-h-[34px] items-center">
                     <x-local-date :value="$subject->created_at" format="D MMMM YYYY" />
+                </dd>
+
+                <dt class="flex min-h-[34px] items-center gap-2 text-muted">
+                    <flux:icon.flag variant="outline" class="size-[15px]" />
+                    {{ __('Target') }}
+                </dt>
+                <dd class="flex min-h-[34px] flex-wrap items-center gap-x-2.5">
+                    @if ($subject->target_date)
+                        {{-- A date, not a timestamp: shown as stored (R1) --}}
+                        <span>{{ $subject->target_date->isoFormat('D MMMM YYYY') }}</span>
+                        <span class="font-mono text-xs text-muted">
+                            @if ($subject->target_days_left > 0)
+                                {{ trans_choice(':count day left|:count days left', $subject->target_days_left) }}
+                            @elseif ($subject->target_days_left === 0)
+                                {{ __('Due today') }}
+                            @else
+                                {{ trans_choice(':count day over|:count days over', abs($subject->target_days_left)) }}
+                            @endif
+                        </span>
+                    @else
+                        <span class="text-muted">{{ __('No date') }}</span>
+                    @endif
                 </dd>
 
                 <dt class="flex min-h-[34px] items-center gap-2 text-muted">
@@ -79,6 +129,18 @@
                         <span class="text-muted">{{ __('No tasks yet') }}</span>
                     @endif
                 </dd>
+
+                @if ($subject->tags !== [])
+                    <dt class="flex min-h-[34px] items-center gap-2 text-muted">
+                        <flux:icon.tag variant="outline" class="size-[15px]" />
+                        {{ __('Tags') }}
+                    </dt>
+                    <dd class="flex min-h-[34px] flex-wrap items-center gap-1.5">
+                        @foreach ($subject->tags as $tag)
+                            <span class="rounded-[5px] bg-active/70 px-2 py-px text-[13px]">{{ $tag }}</span>
+                        @endforeach
+                    </dd>
+                @endif
             </dl>
 
             @if (filled($subject->description))
@@ -173,7 +235,7 @@
                                         @if ($milestone->is_done)
                                             <span class="flex items-center gap-1.5 self-start font-mono text-xs whitespace-nowrap text-muted">
                                                 <flux:icon.check variant="micro" class="size-3.5" />
-                                                {{ __('Done') }}
+                                                {{ __('Done') }} · <x-local-date :value="$milestone->completed_at" format="D MMM" />
                                             </span>
                                         @elseif ($milestone->tasks_count > 0)
                                             <span class="self-start font-mono text-xs whitespace-nowrap text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
@@ -222,6 +284,25 @@
 
             <flux:input wire:model="form.title" :label="__('Title')" required />
             <flux:textarea wire:model="form.description" :label="__('Description')" rows="3" />
+
+            <div class="grid gap-6 sm:grid-cols-2">
+                <flux:select wire:model="form.status" :label="__('Status')">
+                    @foreach (SubjectStatus::cases() as $status)
+                        <flux:select.option :value="$status->value">{{ __($status->label()) }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+
+                <flux:input wire:model="form.target_date" :label="__('Target date')" type="date" />
+            </div>
+
+            <flux:input
+                wire:model="form.tags"
+                :label="__('Tags')"
+                description:trailing="{{ __('Separate tags with commas, up to 5.') }}"
+                placeholder="backend, portfolio"
+            />
+
+            <x-colour-picker wire:model="form.colour" />
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>

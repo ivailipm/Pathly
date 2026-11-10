@@ -34,7 +34,7 @@ class Show extends Component
 
     public function edit(): void
     {
-        $this->form->fill($this->subject->only(['title', 'description']));
+        $this->form->fillFrom($this->subject);
 
         $this->editing = true;
     }
@@ -43,7 +43,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->subject);
 
-        $this->subject->update($this->form->validate());
+        $this->subject->update($this->form->data());
 
         $this->editing = false;
     }

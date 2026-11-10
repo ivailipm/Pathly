@@ -25,4 +25,14 @@ class MilestoneFactory extends Factory
             'position' => 1,
         ];
     }
+
+    /**
+     * Indicate that the milestone is finished (R6). Its tasks are not changed.
+     */
+    public function completed(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'completed_at' => now(),
+        ]);
+    }
 }

@@ -115,11 +115,14 @@ class Show extends Component
         $this->authorize('update', $this->subject);
 
         $this->milestone->tasks()->create([
-            ...$this->taskForm->validate(),
+            ...$this->taskForm->data(),
             'status' => TaskStatus::tryFrom($this->addingTo ?? '') ?? TaskStatus::Todo,
             // reorder() drops the relation's orderBy, which Postgres rejects in an aggregate
             'position' => (int) $this->milestone->tasks()->reorder()->max('position') + 1,
         ]);
+
+        // A new task reopens a finished milestone (unless it was added straight to Done)
+        $this->milestone->syncCompletion();
 
         $this->taskForm->reset();
     }
@@ -128,7 +131,7 @@ class Show extends Component
     {
         $task = $this->findTask($taskId);
 
-        $this->editTaskForm->fill($task->only(['title', 'url']));
+        $this->editTaskForm->fill([...$task->only(['title', 'url']), 'type' => $task->type?->value]);
 
         $this->editingTaskId = $task->id;
     }
@@ -137,7 +140,8 @@ class Show extends Component
     {
         $this->authorize('update', $this->subject);
 
-        $this->findTask((int) $this->editingTaskId)->update($this->editTaskForm->validate());
+        // No status change, so no syncCompletion() here
+        $this->findTask((int) $this->editingTaskId)->update($this->editTaskForm->data());
 
         $this->cancelTaskEdit();
     }
@@ -155,6 +159,9 @@ class Show extends Component
         $this->authorize('update', $this->subject);
 
         $this->findTask($taskId)->delete();
+
+        // Deleting the last task that wasn't done finishes the milestone; deleting the last task reopens it
+        $this->milestone->syncCompletion();
 
         if ($this->editingTaskId === $taskId) {
             $this->cancelTaskEdit();
@@ -190,6 +197,8 @@ class Show extends Component
                     $columnTask->save();
                 }
             }
+
+            $this->milestone->syncCompletion();
         });
     }
 

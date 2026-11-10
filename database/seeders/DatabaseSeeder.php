@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\SubjectColour;
 use App\Enums\TaskStatus;
 use App\Models\Milestone;
 use App\Models\Subject;
@@ -25,7 +26,15 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // 3 subjects, each with 4 ordered milestones of 5 ordered tasks
-        Subject::factory(3)->for($user)->create()->each(function (Subject $subject) {
+        $subjects = [
+            ['colour' => SubjectColour::Clay, 'tags' => ['backend', 'portfolio'], 'target_date' => now()->addDays(50)->toDateString()],
+            ['colour' => SubjectColour::Slate, 'tags' => ['maths'], 'target_date' => null],
+            ['colour' => SubjectColour::Moss, 'tags' => [], 'target_date' => null],
+        ];
+
+        foreach ($subjects as $index => $properties) {
+            $subject = Subject::factory()->for($user)->create($properties);
+
             foreach (range(1, 4) as $milestonePosition) {
                 $milestone = Milestone::factory()->for($subject)->create([
                     'position' => $milestonePosition,
@@ -34,10 +43,15 @@ class DatabaseSeeder extends Seeder
                 foreach (range(1, 5) as $taskPosition) {
                     Task::factory()->for($milestone)->create([
                         'position' => $taskPosition,
-                        'status' => fake()->randomElement(TaskStatus::cases()),
+                        // The first subject's first milestone is finished, so the seeded data shows completion
+                        'status' => $index === 0 && $milestonePosition === 1
+                            ? TaskStatus::Done
+                            : fake()->randomElement(TaskStatus::cases()),
                     ]);
                 }
+
+                $milestone->syncCompletion();
             }
-        });
+        }
     }
 }

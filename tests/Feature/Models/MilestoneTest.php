@@ -34,21 +34,9 @@ it('numbers over all siblings even inside a filtered query', function () {
     expect($fourth->number)->toBe(4);
 });
 
-it('is done only when it has tasks and all are done', function () {
-    $empty = Milestone::factory()->create();
-
-    $mixed = Milestone::factory()->create();
-    Task::factory()->for($mixed)->done()->create();
-    Task::factory()->for($mixed)->inProgress()->create();
-
-    $finished = Milestone::factory()->create();
-    Task::factory()->count(2)->for($finished)->done()->create();
-
-    $done = Milestone::query()->withTaskCounts()->get()->mapWithKeys(fn (Milestone $milestone) => [$milestone->id => $milestone->is_done]);
-
-    expect($done[$empty->id])->toBeFalse()
-        ->and($done[$mixed->id])->toBeFalse()
-        ->and($done[$finished->id])->toBeTrue();
+it('is done once it has a completion date', function () {
+    expect(Milestone::factory()->make()->is_done)->toBeFalse()
+        ->and(Milestone::factory()->completed()->make()->is_done)->toBeTrue();
 });
 
 it('counts tasks by status', function () {

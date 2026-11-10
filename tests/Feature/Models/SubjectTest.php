@@ -14,7 +14,7 @@ function librarySubject(Subject $subject): Subject
 
 it('uses the first not-done milestone as the current one', function () {
     $subject = Subject::factory()->create();
-    $finished = Milestone::factory()->for($subject)->create(['position' => 1]);
+    $finished = Milestone::factory()->for($subject)->completed()->create(['position' => 1]);
     Task::factory()->for($finished)->done()->create();
     $started = Milestone::factory()->for($subject)->create(['position' => 2]);
     Task::factory()->for($started)->inProgress()->create();
@@ -28,7 +28,7 @@ it('uses the first not-done milestone as the current one', function () {
 
 it('lets an empty milestone be the current one', function () {
     $subject = Subject::factory()->create();
-    $finished = Milestone::factory()->for($subject)->create(['position' => 1]);
+    $finished = Milestone::factory()->for($subject)->completed()->create(['position' => 1]);
     Task::factory()->for($finished)->done()->create();
     $empty = Milestone::factory()->for($subject)->create(['position' => 2]);
 
@@ -37,8 +37,8 @@ it('lets an empty milestone be the current one', function () {
 
 it('has no current milestone when every milestone is done', function () {
     $subject = Subject::factory()->create();
-    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 1]))->done()->create();
-    Task::factory()->for(Milestone::factory()->for($subject)->create(['position' => 2]))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->completed()->create(['position' => 1]))->done()->create();
+    Task::factory()->for(Milestone::factory()->for($subject)->completed()->create(['position' => 2]))->done()->create();
 
     $loaded = librarySubject($subject);
 

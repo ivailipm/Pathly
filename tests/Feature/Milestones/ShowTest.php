@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Livewire\Milestones\Show;
 use App\Models\Milestone;
 use App\Models\Subject;
@@ -554,4 +555,62 @@ it('opens the edit modal with the milestone form', function () {
         ->assertSet('editing', true)
         ->assertSet('form.title', 'Reverb')
         ->assertSeeHtml('wire:model.self="editing"');
+});
+
+// Step C: task types
+
+it('adds a task with a type', function () {
+    $milestone = Milestone::factory()->create();
+
+    milestonePage($milestone)
+        ->set('taskForm.title', 'Read the broadcasting docs')
+        ->set('taskForm.type', 'docs')
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    expect($milestone->tasks()->sole()->type)->toBe(TaskType::Docs);
+});
+
+it('adds a task without a type', function () {
+    $milestone = Milestone::factory()->create();
+
+    milestonePage($milestone)
+        ->set('taskForm.title', 'Untyped')
+        ->set('taskForm.type', '')
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    expect($milestone->tasks()->sole()->type)->toBeNull();
+});
+
+it('rejects an unknown task type', function () {
+    milestonePage(Milestone::factory()->create())
+        ->set('taskForm.title', 'Odd')
+        ->set('taskForm.type', 'podcast')
+        ->call('addTask')
+        ->assertHasErrors(['taskForm.type']);
+});
+
+it('edits a task\'s type', function () {
+    $milestone = Milestone::factory()->create();
+    $task = Task::factory()->for($milestone)->create(['type' => TaskType::Video]);
+
+    milestonePage($milestone)
+        ->call('editTask', $task->id)
+        ->assertSet('editTaskForm.type', 'video')
+        ->set('editTaskForm.type', 'exercise')
+        ->call('updateTask')
+        ->assertHasNoErrors();
+
+    expect($task->fresh()?->type)->toBe(TaskType::Exercise);
+});
+
+it('labels cards with their type', function () {
+    $milestone = Milestone::factory()->create();
+    Task::factory()->for($milestone)->create(['position' => 1, 'type' => TaskType::Exercise, 'title' => 'Build it']);
+    Task::factory()->for($milestone)->create(['position' => 2, 'type' => TaskType::Docs, 'title' => 'Read it']);
+    Task::factory()->for($milestone)->done()->create(['position' => 3, 'type' => TaskType::Video, 'url' => null, 'title' => 'Watched it']);
+
+    milestonePage($milestone)
+        ->assertSeeInOrder(['Exercise · Up next', 'Build it', 'Docs', 'Read it', 'Watched it', 'Video']);
 });

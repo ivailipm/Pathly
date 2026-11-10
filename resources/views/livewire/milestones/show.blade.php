@@ -1,4 +1,5 @@
 @use('App\Enums\TaskStatus')
+@use('App\Enums\TaskType')
 
 @php
     $taskCount = collect($this->columns)->sum(fn ($column) => $column->count());
@@ -106,6 +107,8 @@
                             @php
                                 $isDone = $task->status === TaskStatus::Done;
                                 $isUpNext = $task->id === $this->upNextTaskId;
+                                $typeLabel = $task->type ? __($task->type->label()) : null;
+                                $label = implode(' · ', array_filter([$typeLabel, $isUpNext ? __('Up next') : null]));
                             @endphp
 
                             <article
@@ -122,6 +125,12 @@
                                     <form wire:submit="updateTask" class="min-w-0 flex-1 space-y-3">
                                         <flux:input wire:model="editTaskForm.title" :label="__('Title')" required />
                                         <flux:input wire:model="editTaskForm.url" :label="__('Link')" type="url" placeholder="https://" />
+                                        <flux:select wire:model="editTaskForm.type" :label="__('Type')">
+                                            <flux:select.option value="">{{ __('No type') }}</flux:select.option>
+                                            @foreach (TaskType::cases() as $type)
+                                                <flux:select.option :value="$type->value">{{ __($type->label()) }}</flux:select.option>
+                                            @endforeach
+                                        </flux:select>
 
                                         <div class="flex gap-2">
                                             <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
@@ -134,8 +143,12 @@
                                     @endif
 
                                     <div @class(['flex min-w-0 flex-1 flex-col', 'gap-2.5' => ! $isDone, 'gap-0.5' => $isDone])>
-                                        @if ($isUpNext)
-                                            <span class="font-mono text-[11px] tracking-label text-vermilion uppercase">{{ __('Up next') }}</span>
+                                        @if (! $isDone && $label !== '')
+                                            <span @class([
+                                                'font-mono text-[11px] tracking-label uppercase',
+                                                'text-vermilion' => $isUpNext,
+                                                'text-muted' => ! $isUpNext,
+                                            ])>{{ $label }}</span>
                                         @endif
 
                                         <span @class([
@@ -159,6 +172,8 @@
                                                 @endunless
                                                 <span class="min-w-0 truncate">{{ $task->display_url }}</span>
                                             </a>
+                                        @elseif ($isDone && $typeLabel)
+                                            <span class="font-mono text-[11px] text-muted">{{ $typeLabel }}</span>
                                         @endif
                                     </div>
 
@@ -206,6 +221,12 @@
                         <form wire:submit="addTask" class="flex flex-col gap-3 rounded-task border border-rule bg-white p-3.5">
                             <flux:input wire:model="taskForm.title" :label="__('Title')" required autofocus />
                             <flux:input wire:model="taskForm.url" :label="__('Link (optional)')" type="url" placeholder="https://" />
+                            <flux:select wire:model="taskForm.type" :label="__('Type')">
+                                <flux:select.option value="">{{ __('No type') }}</flux:select.option>
+                                @foreach (TaskType::cases() as $type)
+                                    <flux:select.option :value="$type->value">{{ __($type->label()) }}</flux:select.option>
+                                @endforeach
+                            </flux:select>
 
                             <div class="flex gap-2">
                                 <flux:button type="submit" variant="primary">{{ __('Add') }}</flux:button>

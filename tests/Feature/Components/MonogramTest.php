@@ -1,22 +1,16 @@
 <?php
 
+use App\Enums\SubjectColour;
 use App\Models\Subject;
 use Illuminate\Support\Facades\Blade;
 
-// R8: clay, slate, moss, plum by id. Step C switches the tint to the subject's colour column.
-it('shows the first letter on the tint of the subject', function (int $id, string $tint) {
+it('shows the first letter on the tint of the subject', function (SubjectColour $colour) {
     $html = Blade::render('<x-monogram :subject="$subject" />', [
-        'subject' => Subject::factory()->make(['id' => $id, 'title' => 'machine learning']),
+        'subject' => Subject::factory()->make(['title' => 'machine learning', 'colour' => $colour]),
     ]);
 
     expect($html)
-        ->toContain("bg-{$tint} text-{$tint}-ink")
+        ->toContain("bg-{$colour->value} text-{$colour->value}-ink")
         ->toContain('aria-hidden="true"')
         ->and(trim(strip_tags($html)))->toBe('M');
-})->with([
-    [1, 'clay'],
-    [2, 'slate'],
-    [3, 'moss'],
-    [4, 'plum'],
-    [5, 'clay'],
-]);
+})->with(SubjectColour::cases());

@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Forms;
 
+use App\Enums\TaskType;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
@@ -13,4 +15,31 @@ class TaskForm extends Form
     // Only http(s), so a task link can never be a `javascript:` URL
     #[Validate('nullable|url:http,https|max:255')]
     public ?string $url = null;
+
+    /** A TaskType value, or null/empty for "No type" */
+    public ?string $type = null;
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function rules(): array
+    {
+        return [
+            'type' => ['nullable', Rule::enum(TaskType::class)],
+        ];
+    }
+
+    /**
+     * The validated values, ready for create() or update(): an empty type as null.
+     *
+     * @return array<string, mixed>
+     */
+    public function data(): array
+    {
+        $validated = $this->validate();
+
+        $validated['type'] = filled($validated['type'] ?? null) ? $validated['type'] : null;
+
+        return $validated;
+    }
 }
