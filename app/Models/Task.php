@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Support\Link;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -87,15 +88,6 @@ class Task extends Model
      */
     protected function displayUrl(): Attribute
     {
-        return Attribute::get(function (): ?string {
-            if ($this->url === null) {
-                return null;
-            }
-
-            $url = (string) preg_replace('#^https?://#i', '', $this->url);
-            $url = (string) preg_replace('#^www\.#i', '', $url);
-
-            return rtrim($url, '/');
-        });
+        return Attribute::get(fn (): ?string => Link::display($this->url));
     }
 }

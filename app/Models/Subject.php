@@ -125,6 +125,29 @@ class Subject extends Model
     }
 
     /**
+     * What the subject is learned from: links and books, in the order they were added.
+     *
+     * @return HasMany<Source, $this>
+     */
+    public function sources(): HasMany
+    {
+        return $this->hasMany(Source::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * Add a source at the end of the list.
+     */
+    public function addSource(string $title, ?string $url): Source
+    {
+        return $this->sources()->create([
+            'title' => $title,
+            'url' => $url,
+            // reorder() drops the relation's orderBy, which Postgres rejects in an aggregate
+            'position' => (int) $this->sources()->reorder()->max('position') + 1,
+        ]);
+    }
+
+    /**
      * Add tasks_count, done_tasks_count and in_progress_tasks_count over all of the subject's milestones.
      *
      * @param  Builder<Subject>  $query

@@ -55,7 +55,11 @@ class Index extends Component
      */
     public function save(): void
     {
-        Auth::user()->subjects()->create($this->form->data());
+        $subject = Auth::user()->subjects()->create($this->form->data());
+
+        foreach ($this->form->sourceList() as $source) {
+            $subject->addSource($source['title'], $source['url']);
+        }
 
         $this->form->reset();
         $this->setDefaultColour();

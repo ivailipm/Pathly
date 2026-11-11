@@ -25,7 +25,7 @@ use Illuminate\Database\Seeder;
  *
  * @phpstan-type TaskRow array{0: string, 1: string|null, 2: TaskType|null, 3?: TaskStatus}
  * @phpstan-type MilestoneRow array{0: string, 1: string, 2: int|null, 3: list<TaskRow>}
- * @phpstan-type SubjectRow array{title: string, description: string, colour: SubjectColour, tags: list<string>, target: int|null, started: int, milestones: list<MilestoneRow>}
+ * @phpstan-type SubjectRow array{title: string, description: string, colour: SubjectColour, tags: list<string>, target: int|null, started: int, sources: list<array{0: string, 1: string|null}>, milestones: list<MilestoneRow>}
  */
 class DemoSeeder extends Seeder
 {
@@ -80,6 +80,10 @@ class DemoSeeder extends Seeder
             'created_at' => $created,
             'updated_at' => $created,
         ]);
+
+        foreach ($row['sources'] as [$title, $url]) {
+            $subject->addSource($title, $url);
+        }
 
         foreach ($row['milestones'] as $index => [$title, $description, $doneDaysAgo, $tasks]) {
             $completedAt = $doneDaysAgo === null ? null : $this->at($doneDaysAgo, '21:00');
@@ -257,6 +261,12 @@ class DemoSeeder extends Seeder
                 'tags' => ['backend', 'portfolio'],
                 'target' => 35,
                 'started' => 17,
+                'sources' => [
+                    ['Laravel docs', 'https://laravel.com/docs'],
+                    ['Livewire docs', 'https://livewire.laravel.com/docs'],
+                    ['Laracasts', 'https://laracasts.com'],
+                    ['Laravel: Up & Running', null],
+                ],
                 'milestones' => [
                     ['Routing & Blade', 'Routes, controllers, layouts and components.', 15, [
                         ['Read: Routing', 'https://laravel.com/docs/routing', TaskType::Docs],
@@ -306,6 +316,12 @@ class DemoSeeder extends Seeder
                 'tags' => ['maths'],
                 'target' => 81,
                 'started' => 24,
+                'sources' => [
+                    ['Mathematics for Machine Learning', 'https://mml-book.github.io'],
+                    ['Machine Learning Specialization', 'https://www.coursera.org/learn/machine-learning'],
+                    ['scikit-learn user guide', 'https://scikit-learn.org/stable/user_guide.html'],
+                    ['Hands-On Machine Learning (book)', null],
+                ],
                 'milestones' => [
                     ['Vectors and matrices refresher', 'Dot products, matrix multiplication and why shapes matter.', 10, [
                         ['Watch: Essence of linear algebra, chapters 1 to 4', 'https://www.3blue1brown.com/topics/linear-algebra', TaskType::Video],
@@ -344,6 +360,11 @@ class DemoSeeder extends Seeder
                 'tags' => ['language'],
                 'target' => null,
                 'started' => 45,
+                'sources' => [
+                    ['SpanishDict grammar guides', 'https://www.spanishdict.com/guide'],
+                    ['Coffee Break Spanish', 'https://coffeebreaklanguages.com'],
+                    ['Gramática de uso del español B1-B2 (book)', null],
+                ],
                 'milestones' => [
                     ['Ser, estar and the present tense', 'The two verbs for "to be", and the regular and irregular present.', 40, [
                         ['Read: Ser vs estar', 'https://www.spanishdict.com/guide/ser-vs-estar', TaskType::Docs],
@@ -395,6 +416,10 @@ class DemoSeeder extends Seeder
                 'tags' => ['javascript'],
                 'target' => null,
                 'started' => 2,
+                'sources' => [
+                    ['D3 documentation', 'https://d3js.org'],
+                    ['Observable', 'https://observablehq.com'],
+                ],
                 'milestones' => [
                     ['Scales and axes', 'Map data to pixels and label it honestly.', null, [
                         ['Read: d3-scale', 'https://d3js.org/d3-scale', TaskType::Docs],

@@ -5,6 +5,7 @@ namespace App\Livewire\Forms;
 use App\Enums\SubjectColour;
 use App\Enums\SubjectStatus;
 use App\Models\Subject;
+use App\Rules\SourceList;
 use App\Rules\TagList;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Validate;
@@ -28,6 +29,9 @@ class SubjectForm extends Form
 
     public string $colour = 'clay';
 
+    /** Only in the New subject form: one source per line, saved by sourceList() */
+    public string $sources = '';
+
     /**
      * @return array<string, mixed>
      */
@@ -38,6 +42,7 @@ class SubjectForm extends Form
             'target_date' => ['nullable', 'date_format:Y-m-d'],
             'tags' => ['nullable', 'string', 'max:300', new TagList],
             'colour' => ['required', Rule::enum(SubjectColour::class)],
+            'sources' => ['nullable', 'string', 'max:20000', new SourceList],
         ];
     }
 
@@ -53,7 +58,20 @@ class SubjectForm extends Form
         $validated['tags'] = TagList::parse($validated['tags'] ?? null);
         $validated['target_date'] = filled($validated['target_date'] ?? null) ? $validated['target_date'] : null;
 
+        // Not a column: saved as Source rows
+        unset($validated['sources']);
+
         return $validated;
+    }
+
+    /**
+     * The sources typed in the form, parsed (call after data(), which validates them).
+     *
+     * @return list<array{title: string, url: string|null}>
+     */
+    public function sourceList(): array
+    {
+        return SourceList::parse($this->sources);
     }
 
     public function fillFrom(Subject $subject): void
