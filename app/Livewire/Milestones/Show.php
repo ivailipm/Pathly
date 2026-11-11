@@ -3,6 +3,7 @@
 namespace App\Livewire\Milestones;
 
 use App\Enums\TaskStatus;
+use App\Events\BoardChanged;
 use App\Livewire\Forms\MilestoneForm;
 use App\Livewire\Forms\NoteForm;
 use App\Livewire\Forms\TaskForm;
@@ -79,6 +80,8 @@ class Show extends Component
         $this->milestone->update($this->form->validate());
 
         $this->editing = false;
+
+        $this->broadcastBoard();
     }
 
     public function cancelEdit(): void
@@ -143,6 +146,8 @@ class Show extends Component
         $this->milestone->syncCompletion();
 
         $this->taskForm->reset();
+
+        $this->broadcastBoard();
     }
 
     public function editTask(int $taskId): void
@@ -162,6 +167,8 @@ class Show extends Component
         $this->findTask((int) $this->editingTaskId)->update($this->editTaskForm->data());
 
         $this->cancelTaskEdit();
+
+        $this->broadcastBoard();
     }
 
     public function cancelTaskEdit(): void
@@ -192,6 +199,8 @@ class Show extends Component
         if ($this->editingTaskId === $taskId) {
             $this->cancelTaskEdit();
         }
+
+        $this->broadcastBoard();
     }
 
     /**
@@ -226,6 +235,9 @@ class Show extends Component
 
             $this->milestone->syncCompletion();
         });
+
+        // After the transaction, so other tabs never reload a half-saved board
+        $this->broadcastBoard();
     }
 
     /**
@@ -247,6 +259,8 @@ class Show extends Component
         ]);
 
         unset($this->runningSession, $this->minutesLogged, $this->columns);
+
+        $this->broadcastBoard();
     }
 
     /**
@@ -259,6 +273,8 @@ class Show extends Component
         $this->stopSession($this->runningSession ?? abort(404));
 
         unset($this->runningSession, $this->minutesLogged, $this->columns);
+
+        $this->broadcastBoard();
     }
 
     /**
@@ -281,6 +297,8 @@ class Show extends Component
         $this->noteForm->task_id = $this->defaultNoteTaskId();
 
         unset($this->notes);
+
+        $this->broadcastBoard();
     }
 
     /**
@@ -290,6 +308,18 @@ class Show extends Component
     public function refreshTotals(): void
     {
         unset($this->minutesLogged, $this->columns, $this->notes);
+    }
+
+    /**
+     * Another tab changed this board (BoardChanged over Reverb): re-read everything it can have touched.
+     * The leading dot in ".board.changed" makes Echo use the broadcastAs() name as it is.
+     */
+    #[On('echo-private:milestones.{milestone.id},.board.changed')]
+    public function refreshBoard(): void
+    {
+        $this->milestone->refresh();
+
+        unset($this->columns, $this->notes, $this->upNextTaskId, $this->runningSession, $this->minutesLogged);
     }
 
     /**
@@ -372,6 +402,14 @@ class Show extends Component
     public function render(): View
     {
         return view('livewire.milestones.show')->title($this->milestone->title);
+    }
+
+    /**
+     * Tell the milestone's other open tabs to reload the board. Once per action, at the end.
+     */
+    private function broadcastBoard(): void
+    {
+        broadcast(new BoardChanged($this->milestone->id))->toOthers();
     }
 
     /**
