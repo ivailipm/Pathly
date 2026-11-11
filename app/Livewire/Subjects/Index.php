@@ -2,12 +2,12 @@
 
 namespace App\Livewire\Subjects;
 
-use App\Enums\SubjectColour;
 use App\Enums\SubjectStatus;
 use App\Livewire\Forms\SubjectForm;
 use App\Models\Milestone;
 use App\Models\Subject;
 use App\Support\LocalTime;
+use App\Support\Tint;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -55,7 +55,11 @@ class Index extends Component
      */
     public function save(): void
     {
-        Auth::user()->subjects()->create($this->form->data());
+        $subject = Auth::user()->subjects()->create($this->form->data());
+
+        foreach ($this->form->sourceList() as $source) {
+            $subject->addSource($source['title'], $source['url']);
+        }
 
         $this->form->reset();
         $this->setDefaultColour();
@@ -129,6 +133,6 @@ class Index extends Component
      */
     private function setDefaultColour(): void
     {
-        $this->form->colour = SubjectColour::forIndex(Auth::user()->subjects()->count())->value;
+        $this->form->colour = Tint::forIndex(Auth::user()->subjects()->count());
     }
 }

@@ -154,7 +154,14 @@
 
             <flux:input wire:model="form.title" :label="__('Title')" required autofocus />
             <flux:textarea wire:model="form.description" :label="__('Description')" rows="3" />
-            <x-colour-picker wire:model="form.colour" />
+            <flux:textarea
+                wire:model="form.sources"
+                :label="__('Sources')"
+                rows="3"
+                placeholder="Laravel docs https://laravel.com/docs&#10;https://laracasts.com&#10;Laravel: Up &amp; Running (book)"
+                description:trailing="{{ __('Optional. One per line: a link, a title and a link, or just a title for a book.') }}"
+            />
+            <x-colour-picker wire:model="form.colour" :value="$form->colour" />
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>

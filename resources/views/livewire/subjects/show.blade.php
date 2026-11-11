@@ -284,31 +284,35 @@
                 @endif
             </div>
 
-            @if ($this->recentNotes->isNotEmpty())
-                <aside class="flex min-w-0 flex-[1_1_260px] flex-col gap-1" aria-labelledby="margins-heading">
-                    <h2 id="margins-heading" class="border-b border-ink pb-3">
-                        <x-eyebrow>{{ __('In the margins') }}</x-eyebrow>
-                    </h2>
+            <aside class="flex min-w-0 flex-[1_1_260px] flex-col gap-12">
+                @if ($this->recentNotes->isNotEmpty())
+                    <section class="flex flex-col gap-1" aria-labelledby="margins-heading">
+                        <h2 id="margins-heading" class="border-b border-ink pb-3">
+                            <x-eyebrow>{{ __('In the margins') }}</x-eyebrow>
+                        </h2>
 
-                    @foreach ($this->recentNotes as $note)
-                        <a
-                            href="{{ route('milestones.show', [$subject, $note->milestone]) }}"
-                            wire:navigate
-                            wire:key="margin-note-{{ $note->id }}"
-                            class="group flex flex-col gap-1.5 border-b border-rule py-4 focus-visible:outline-2 focus-visible:outline-ink"
-                        >
-                            <span class="font-mono text-[11px] text-muted uppercase">
-                                <x-local-date :value="$note->created_at" format="ddd D MMM" /> · {{ sprintf('%02d', $note->milestone->number) }}
-                            </span>
-                            <p class="line-clamp-5 font-serif text-[17px] leading-[1.45] text-ink group-hover:text-vermilion">{{ $note->body }}</p>
+                        @foreach ($this->recentNotes as $note)
+                            <a
+                                href="{{ route('milestones.show', [$subject, $note->milestone]) }}"
+                                wire:navigate
+                                wire:key="margin-note-{{ $note->id }}"
+                                class="group flex flex-col gap-1.5 border-b border-rule py-4 focus-visible:outline-2 focus-visible:outline-ink"
+                            >
+                                <span class="font-mono text-[11px] text-muted uppercase">
+                                    <x-local-date :value="$note->created_at" format="ddd D MMM" /> · {{ sprintf('%02d', $note->milestone->number) }}
+                                </span>
+                                <p class="line-clamp-5 font-serif text-[17px] leading-[1.45] text-ink group-hover:text-vermilion">{{ $note->body }}</p>
+                            </a>
+                        @endforeach
+
+                        <a href="{{ route('notes.index') }}" wire:navigate class="self-start pt-3 text-sm text-muted underline underline-offset-4 hover:text-ink">
+                            {{ __('All field notes') }}
                         </a>
-                    @endforeach
+                    </section>
+                @endif
 
-                    <a href="{{ route('notes.index') }}" wire:navigate class="self-start pt-3 text-sm text-muted underline underline-offset-4 hover:text-ink">
-                        {{ __('All field notes') }}
-                    </a>
-                </aside>
-            @endif
+                <livewire:subjects.sources :subject="$subject" :key="'sources-'.$subject->id" />
+            </aside>
         </section>
     </div>
 
@@ -336,7 +340,7 @@
                 placeholder="backend, portfolio"
             />
 
-            <x-colour-picker wire:model="form.colour" />
+            <x-colour-picker wire:model="form.colour" :value="$form->colour" />
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>

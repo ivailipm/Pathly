@@ -7,6 +7,7 @@
 
     // Read once: Livewire doesn't cache a computed property that returns null, so each read would query again
     $runningSession = $this->runningSession;
+    $sourceUrls = $this->sourceUrls;
 @endphp
 
 <div>
@@ -280,6 +281,9 @@
                                                 <flux:menu.separator />
 
                                                 <flux:menu.item icon="pencil" wire:click="editTask({{ $task->id }})">{{ __('Edit') }}</flux:menu.item>
+                                                @if ($task->url !== null && ! in_array($task->url, $sourceUrls, true))
+                                                    <flux:menu.item icon="bookmark" wire:click="pinSource({{ $task->id }})">{{ __('Add link to sources') }}</flux:menu.item>
+                                                @endif
                                                 <flux:menu.item
                                                     icon="trash"
                                                     variant="danger"

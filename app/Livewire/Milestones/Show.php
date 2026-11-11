@@ -27,6 +27,7 @@ use Livewire\Component;
  * @property-read array<string, Collection<int, Task>> $columns
  * @property-read StudySession|null $runningSession
  * @property-read int|null $upNextTaskId
+ * @property-read list<string> $sourceUrls
  */
 class Show extends Component
 {
@@ -455,6 +456,39 @@ class Show extends Component
     /**
      * Load a task through this milestone, so an id from another milestone gives 404.
      */
+    /**
+     * Add a task's link to the subject's sources, named after the task. Does nothing when it's already there.
+     */
+    public function pinSource(int $taskId): void
+    {
+        $this->authorize('update', $this->subject);
+
+        $task = $this->findTask($taskId);
+
+        if ($task->url === null) {
+            return;
+        }
+
+        if (! $this->subject->sources()->where('url', $task->url)->exists()) {
+            $this->subject->addSource($task->title, $task->url);
+        }
+
+        unset($this->sourceUrls);
+
+        Flux::toast(__('Added to the subject\'s sources.'));
+    }
+
+    /**
+     * The links already in the subject's sources, so a task's "Add link to sources" hides once it's there.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function sourceUrls(): array
+    {
+        return array_values($this->subject->sources()->whereNotNull('url')->pluck('url')->all());
+    }
+
     private function findTask(int $taskId): Task
     {
         return $this->milestone->tasks()->findOrFail($taskId);

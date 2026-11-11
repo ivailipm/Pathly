@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\SubjectColour;
 use App\Enums\SubjectStatus;
 use App\Enums\TaskStatus;
 use App\Livewire\Subjects\Show;
@@ -268,17 +267,17 @@ it('loads the path without a query per milestone', function () {
 // Step C: subject properties
 
 it('edits status, target date, tags and colour', function () {
-    $subject = Subject::factory()->create(['colour' => SubjectColour::Clay]);
+    $subject = Subject::factory()->create(['colour' => '#7a3b22']);
 
     Livewire::actingAs($subject->user)
         ->test(Show::class, ['subject' => $subject])
         ->call('edit')
         ->assertSet('form.status', 'active')
-        ->assertSet('form.colour', 'clay')
+        ->assertSet('form.colour', '#7a3b22')
         ->set('form.status', 'paused')
         ->set('form.target_date', '2026-12-15')
         ->set('form.tags', 'Backend, portfolio, backend')
-        ->set('form.colour', 'slate')
+        ->set('form.colour', '#2d4b5f')
         ->call('update')
         ->assertHasNoErrors()
         ->assertSet('editing', false);
@@ -288,14 +287,14 @@ it('edits status, target date, tags and colour', function () {
     expect($subject->status)->toBe(SubjectStatus::Paused)
         ->and($subject->target_date?->toDateString())->toBe('2026-12-15')
         ->and($subject->tags)->toBe(['backend', 'portfolio'])
-        ->and($subject->colour)->toBe(SubjectColour::Slate);
+        ->and($subject->colour)->toBe('#2d4b5f');
 });
 
 it('fills the edit form from the subject', function () {
     $subject = Subject::factory()->paused()->create([
         'target_date' => '2027-01-31',
         'tags' => ['maths', 'portfolio'],
-        'colour' => SubjectColour::Moss,
+        'colour' => '#e63946',
     ]);
 
     Livewire::actingAs($subject->user)
@@ -304,7 +303,7 @@ it('fills the edit form from the subject', function () {
         ->assertSet('form.status', 'paused')
         ->assertSet('form.target_date', '2027-01-31')
         ->assertSet('form.tags', 'maths, portfolio')
-        ->assertSet('form.colour', 'moss');
+        ->assertSet('form.colour', '#e63946');
 });
 
 it('clears the target date', function () {

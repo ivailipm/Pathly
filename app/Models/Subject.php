@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use App\Enums\SubjectColour;
 use App\Enums\SubjectStatus;
 use App\Enums\TaskStatus;
 use App\Support\LocalTime;
+use App\Support\Tint;
 use Carbon\CarbonImmutable;
 use Database\Factories\SubjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -26,7 +26,8 @@ use Illuminate\Support\Carbon;
  * @property SubjectStatus $status
  * @property CarbonImmutable|null $target_date a date, never converted between timezones (R1)
  * @property list<string> $tags
- * @property SubjectColour $colour
+ * @property string $colour "#rrggbb": any colour, turned into the subject's tones by Tint
+ * @property-read Tint $tint
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read int $tasks_count only when loaded with withTaskCounts()
@@ -57,7 +58,7 @@ class Subject extends Model
     protected $attributes = [
         'status' => 'active',
         'tags' => '[]',
-        'colour' => 'clay',
+        'colour' => Tint::DEFAULT,
     ];
 
     /**
@@ -69,7 +70,6 @@ class Subject extends Model
             'status' => SubjectStatus::class,
             'target_date' => 'date',
             'tags' => 'array',
-            'colour' => SubjectColour::class,
             'tasks_count' => 'integer',
             'done_tasks_count' => 'integer',
             'in_progress_tasks_count' => 'integer',
@@ -122,6 +122,39 @@ class Subject extends Model
     public function studySessions(): HasMany
     {
         return $this->hasMany(StudySession::class);
+    }
+
+    /**
+     * What the subject is learned from: links and books, in the order they were added.
+     *
+     * @return HasMany<Source, $this>
+     */
+    public function sources(): HasMany
+    {
+        return $this->hasMany(Source::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * Add a source at the end of the list.
+     */
+    public function addSource(string $title, ?string $url): Source
+    {
+        return $this->sources()->create([
+            'title' => $title,
+            'url' => $url,
+            // reorder() drops the relation's orderBy, which Postgres rejects in an aggregate
+            'position' => (int) $this->sources()->reorder()->max('position') + 1,
+        ]);
+    }
+
+    /**
+     * The background, text and shade colours of the subject's colour.
+     *
+     * @return Attribute<Tint, never>
+     */
+    protected function tint(): Attribute
+    {
+        return Attribute::get(fn (): Tint => Tint::of($this->colour));
     }
 
     /**
