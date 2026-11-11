@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property int $milestone_id
  * @property string $title
  * @property string|null $url
+ * @property string|null $description
  * @property TaskStatus $status
  * @property TaskType|null $type
  * @property int $position
@@ -28,7 +29,7 @@ use Illuminate\Support\Carbon;
  * @property-read string|null $display_url
  * @property-read int|null $minutes_logged only when loaded with withMinutesLogged(); null means none
  */
-#[Fillable(['milestone_id', 'title', 'url', 'type', 'status', 'position'])]
+#[Fillable(['milestone_id', 'title', 'url', 'description', 'type', 'status', 'position'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -69,6 +70,16 @@ class Task extends Model
     public function studySessions(): HasMany
     {
         return $this->hasMany(StudySession::class);
+    }
+
+    /**
+     * The field notes linked to this task, newest first.
+     *
+     * @return HasMany<Note, $this>
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(Note::class)->latest()->latest('id');
     }
 
     /**

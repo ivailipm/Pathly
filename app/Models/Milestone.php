@@ -133,6 +133,63 @@ class Milestone extends Model
     }
 
     /**
+     * Move a task to a column (its status) and a spot in it: $index counts the column's other tasks. The whole
+     * milestone is renumbered 1..n in board order (columns in status order), then completion is synced (R6).
+     */
+    public function moveTask(Task $task, TaskStatus $status, int $index): void
+    {
+        DB::transaction(function () use ($task, $status, $index) {
+            $others = $this->tasks()->whereKeyNot($task->id)->get();
+
+            $columns = [];
+
+            foreach (TaskStatus::cases() as $column) {
+                $columns[$column->value] = $others->filter(fn (Task $other) => $other->status === $column)->values();
+            }
+
+            $task->status = $status;
+            $columns[$status->value]->splice(max(0, min($index, $columns[$status->value]->count())), 0, [$task]);
+
+            // save() skips tasks that didn't change
+            $next = 1;
+
+            foreach ($columns as $columnTasks) {
+                foreach ($columnTasks as $columnTask) {
+                    $columnTask->position = $next++;
+                    $columnTask->save();
+                }
+            }
+
+            $this->syncCompletion();
+        });
+    }
+
+    /**
+     * Move a task to the end of a column, like the "Move to" menu.
+     */
+    public function moveTaskToEnd(Task $task, TaskStatus $status): void
+    {
+        $this->moveTask($task, $status, PHP_INT_MAX);
+    }
+
+    /**
+     * Delete a task. A timer running on it is stopped first, so its time stays on the subject. Returns false when
+     * that timer had been forgotten (over the limit) and was discarded instead.
+     */
+    public function deleteTask(Task $task): bool
+    {
+        $kept = $task->studySessions()->running()->get()
+            ->reduce(fn (bool $kept, StudySession $session) => $session->stop() && $kept, true);
+
+        $task->delete();
+
+        // Deleting the last task that wasn't done finishes the milestone; deleting the last task reopens it
+        $this->syncCompletion();
+
+        return $kept;
+    }
+
+    /**
      * R3: done once it has a completion date (R6). An empty milestone is never done.
      *
      * @return Attribute<bool, never>

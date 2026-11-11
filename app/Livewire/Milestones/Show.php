@@ -17,7 +17,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -34,7 +33,7 @@ class Show extends Component
     /**
      * A timer running longer than this is treated as forgotten: discarded, not saved (spec assumption 11).
      */
-    public const MAX_TIMER_MINUTES = 600;
+    public const MAX_TIMER_MINUTES = StudySession::MAX_TIMER_MINUTES;
 
     public Subject $subject;
 
@@ -44,13 +43,9 @@ class Show extends Component
 
     public TaskForm $taskForm;
 
-    public TaskForm $editTaskForm;
-
     public NoteForm $noteForm;
 
     public bool $editing = false;
-
-    public ?int $editingTaskId = null;
 
     /**
      * The status value of the column whose add form is open. Only set by openAddTask(), so a tampered
@@ -151,55 +146,18 @@ class Show extends Component
         $this->broadcastBoard();
     }
 
-    public function editTask(int $taskId): void
-    {
-        $task = $this->findTask($taskId);
-
-        $this->editTaskForm->fill([...$task->only(['title', 'url']), 'type' => $task->type?->value]);
-
-        $this->editingTaskId = $task->id;
-    }
-
-    public function updateTask(): void
-    {
-        $this->authorize('update', $this->subject);
-
-        // No status change, so no syncCompletion() here
-        $this->findTask((int) $this->editingTaskId)->update($this->editTaskForm->data());
-
-        $this->cancelTaskEdit();
-
-        $this->broadcastBoard();
-    }
-
-    public function cancelTaskEdit(): void
-    {
-        $this->editingTaskId = null;
-
-        $this->editTaskForm->reset();
-        $this->resetValidation();
-    }
-
+    /**
+     * Delete a task. A timer running on it is stopped first, so its time stays on the subject.
+     */
     public function deleteTask(int $taskId): void
     {
         $this->authorize('update', $this->subject);
 
-        $task = $this->findTask($taskId);
-        $running = $this->runningSession;
-
-        // Keep the time so far: the session stays on the subject after the task is gone
-        if ($running?->task_id === $task->id) {
-            $this->stopSession($running);
+        if (! $this->milestone->deleteTask($this->findTask($taskId))) {
+            $this->warnDiscardedTimer();
         }
 
-        $task->delete();
-
-        // Deleting the last task that wasn't done finishes the milestone; deleting the last task reopens it
-        $this->milestone->syncCompletion();
-
-        if ($this->editingTaskId === $taskId) {
-            $this->cancelTaskEdit();
-        }
+        unset($this->runningSession, $this->minutesLogged);
 
         $this->broadcastBoard();
     }
@@ -215,27 +173,7 @@ class Show extends Component
         // A string, not a TaskStatus parameter: Livewire would turn an unknown value into null
         $target = TaskStatus::tryFrom($status) ?? abort(422);
 
-        DB::transaction(function () use ($taskId, $position, $target) {
-            $task = $this->findTask($taskId);
-
-            $columns = $this->toColumns($this->milestone->tasks()->whereKeyNot($task->id)->get());
-
-            $task->status = $target;
-            $column = $columns[$target->value];
-            $column->splice(max(0, min($position, $column->count())), 0, [$task]);
-
-            // Renumber the whole milestone in board order; save() skips tasks that didn't change
-            $next = 1;
-
-            foreach ($columns as $columnTasks) {
-                foreach ($columnTasks as $columnTask) {
-                    $columnTask->position = $next++;
-                    $columnTask->save();
-                }
-            }
-
-            $this->milestone->syncCompletion();
-        });
+        $this->milestone->moveTask($this->findTask($taskId), $target, $position);
 
         // After the transaction, so other tabs never reload a half-saved board
         $this->broadcastBoard();
@@ -316,6 +254,7 @@ class Show extends Component
      * The leading dot in ".board.changed" makes Echo use the broadcastAs() name as it is.
      */
     #[On('echo-private:milestones.{milestone.id},.board.changed')]
+    #[On('task-changed')]
     public function refreshBoard(): void
     {
         $this->milestone->refresh();
@@ -426,21 +365,17 @@ class Show extends Component
      */
     private function stopSession(StudySession $session): void
     {
-        // Carbon 3 returns a signed float
-        $minutes = (int) ceil(abs($session->started_at->diffInSeconds(now())) / 60);
-
-        if ($minutes > self::MAX_TIMER_MINUTES) {
-            $session->delete();
-
-            Flux::toast(
-                text: __("That timer ran over 10 hours, so it wasn't saved. Log the session by hand."),
-                variant: 'warning',
-            );
-
-            return;
+        if (! $session->stop()) {
+            $this->warnDiscardedTimer();
         }
+    }
 
-        $session->update(['minutes' => max(1, $minutes)]);
+    private function warnDiscardedTimer(): void
+    {
+        Flux::toast(
+            text: __("That timer ran over 10 hours, so it wasn't saved. Log the session by hand."),
+            variant: 'warning',
+        );
     }
 
     /**
@@ -469,9 +404,7 @@ class Show extends Component
             return;
         }
 
-        if (! $this->subject->sources()->where('url', $task->url)->exists()) {
-            $this->subject->addSource($task->title, $task->url);
-        }
+        $this->subject->pinTaskLink($task);
 
         unset($this->sourceUrls);
 

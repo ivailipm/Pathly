@@ -38,7 +38,6 @@ it('broadcasts after each board action', function (Closure $act) {
 })->with([
     'update' => [fn (Testable $page) => $page->call('edit')->set('form.title', 'Renamed')->call('update')],
     'addTask' => [fn (Testable $page) => $page->set('taskForm.title', 'New task')->call('addTask')],
-    'updateTask' => [fn (Testable $page, Task $task) => $page->call('editTask', $task->id)->set('editTaskForm.title', 'Renamed')->call('updateTask')],
     'deleteTask' => [fn (Testable $page, Task $task) => $page->call('deleteTask', $task->id)],
     'moveTask' => [fn (Testable $page, Task $task) => $page->call('moveTask', $task->id, 0, 'done')],
     'startTimer' => [fn (Testable $page, Task $task) => $page->call('startTimer', $task->id)],
@@ -60,8 +59,7 @@ it('does not broadcast when nothing changed', function () {
     liveBoard($milestone)
         ->call('addTask')
         ->assertHasErrors(['taskForm.title'])
-        ->call('openAddTask', 'done')
-        ->call('editTask', Task::factory()->for($milestone)->create()->id);
+        ->call('openAddTask', 'done');
 
     Event::assertNotDispatched(BoardChanged::class);
 });

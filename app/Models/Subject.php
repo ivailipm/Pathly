@@ -148,6 +148,20 @@ class Subject extends Model
     }
 
     /**
+     * Add a task's link to the sources, named after the task, unless it's already there. Returns whether it was added.
+     */
+    public function pinTaskLink(Task $task): bool
+    {
+        if ($task->url === null || $this->sources()->where('url', $task->url)->exists()) {
+            return false;
+        }
+
+        $this->addSource($task->title, $task->url);
+
+        return true;
+    }
+
+    /**
      * The background, text and shade colours of the subject's colour.
      *
      * @return Attribute<Tint, never>

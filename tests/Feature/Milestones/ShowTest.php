@@ -135,42 +135,7 @@ it('deletes the milestone with its tasks and goes back to the subject', function
         ->and(Subject::count())->toBe(1);
 });
 
-// Step E: editing and deleting tasks
-
-it('lets the owner edit a task', function () {
-    $milestone = Milestone::factory()->create();
-    $task = Task::factory()->for($milestone)->create(['title' => 'Old title', 'url' => null]);
-
-    milestonePage($milestone)
-        ->call('editTask', $task->id)
-        ->assertSet('editingTaskId', $task->id)
-        ->assertSet('editTaskForm.title', 'Old title')
-        ->set('editTaskForm.title', 'New title')
-        ->set('editTaskForm.url', 'https://laravel.com')
-        ->call('updateTask')
-        ->assertHasNoErrors()
-        ->assertSet('editingTaskId', null);
-
-    expect($task->fresh())
-        ->title->toBe('New title')
-        ->url->toBe('https://laravel.com');
-});
-
-it('validates a task edit', function () {
-    $milestone = Milestone::factory()->create();
-    $task = Task::factory()->for($milestone)->create(['title' => 'Old title']);
-
-    milestonePage($milestone)
-        ->call('editTask', $task->id)
-        ->set('editTaskForm.title', '')
-        ->call('updateTask')
-        ->assertHasErrors(['editTaskForm.title' => 'required'])
-        ->call('cancelTaskEdit')
-        ->assertHasNoErrors()
-        ->assertSet('editingTaskId', null);
-
-    expect($task->fresh()->title)->toBe('Old title');
-});
+// Step E: deleting tasks (editing is in the task panel: tests/Feature/Tasks/PanelTest.php)
 
 it('deletes a task', function () {
     $milestone = Milestone::factory()->create();
@@ -181,22 +146,10 @@ it('deletes a task', function () {
     expect(Task::count())->toBe(0);
 });
 
-it('stops editing when the task being edited is deleted', function () {
-    $milestone = Milestone::factory()->create();
-    $task = Task::factory()->for($milestone)->create();
-
-    milestonePage($milestone)
-        ->call('editTask', $task->id)
-        ->call('deleteTask', $task->id)
-        ->assertSet('editingTaskId', null)
-        ->assertSet('editTaskForm.title', '');
-});
-
-it('cannot edit or delete a task from another milestone', function () {
+it('cannot delete a task from another milestone', function () {
     $milestone = Milestone::factory()->create();
     $foreignTask = Task::factory()->create(['title' => 'Not yours']);
 
-    milestonePage($milestone)->call('editTask', $foreignTask->id)->assertNotFound();
     milestonePage($milestone)->call('deleteTask', $foreignTask->id)->assertNotFound();
 
     expect($foreignTask->fresh()->title)->toBe('Not yours');
@@ -382,16 +335,6 @@ it('updates the progress after a move', function () {
         ->assertSee('1 of 4 tasks done')
         ->call('moveTask', $tasks['T1']->id, 0, 'done')
         ->assertSee('2 of 4 tasks done');
-});
-
-it('keeps a task edit open when another task moves', function () {
-    $milestone = Milestone::factory()->create();
-    $tasks = sampleBoard($milestone);
-
-    milestonePage($milestone)
-        ->call('editTask', $tasks['T1']->id)
-        ->call('moveTask', $tasks['T3']->id, 0, 'done')
-        ->assertSet('editingTaskId', $tasks['T1']->id);
 });
 
 it('offers to move a task to the other columns', function () {
@@ -589,20 +532,6 @@ it('rejects an unknown task type', function () {
         ->set('taskForm.type', 'podcast')
         ->call('addTask')
         ->assertHasErrors(['taskForm.type']);
-});
-
-it('edits a task\'s type', function () {
-    $milestone = Milestone::factory()->create();
-    $task = Task::factory()->for($milestone)->create(['type' => TaskType::Video]);
-
-    milestonePage($milestone)
-        ->call('editTask', $task->id)
-        ->assertSet('editTaskForm.type', 'video')
-        ->set('editTaskForm.type', 'exercise')
-        ->call('updateTask')
-        ->assertHasNoErrors();
-
-    expect($task->fresh()?->type)->toBe(TaskType::Exercise);
 });
 
 it('labels cards with their type', function () {
