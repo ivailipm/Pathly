@@ -16,6 +16,10 @@ class TaskForm extends Form
     #[Validate('nullable|url:http,https|max:255')]
     public ?string $url = null;
 
+    /** What to do, page numbers, where you stopped. Only in the task panel's edit form. */
+    #[Validate('nullable|string|max:5000')]
+    public ?string $description = null;
+
     /** A TaskType value, or null/empty for "No type" */
     public ?string $type = null;
 
@@ -39,6 +43,7 @@ class TaskForm extends Form
         $validated = $this->validate();
 
         $validated['type'] = filled($validated['type'] ?? null) ? $validated['type'] : null;
+        $validated['description'] = filled($validated['description'] ?? null) ? trim((string) $validated['description']) : null;
 
         return $validated;
     }

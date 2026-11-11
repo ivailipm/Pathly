@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Milestones\Show;
+use App\Livewire\Tasks\Panel;
 use App\Models\Milestone;
 use App\Models\Task;
 use Livewire\Features\SupportTesting\Testable;
@@ -103,11 +104,13 @@ it('keeps the completion date when done tasks are reordered or edited', function
 
     $this->travelTo('2026-10-09 10:00:00');
 
-    board($milestone)
-        ->call('moveTask', $first->id, 1, 'done')
-        ->call('editTask', $first->id)
-        ->set('editTaskForm.title', 'Renamed')
-        ->call('updateTask');
+    board($milestone)->call('moveTask', $first->id, 1, 'done');
+
+    Livewire::actingAs($milestone->subject->user)
+        ->test(Panel::class, ['subject' => $milestone->subject])
+        ->call('openTask', $first->id, true)
+        ->set('form.title', 'Renamed')
+        ->call('save');
 
     expect($milestone->fresh()?->completed_at?->toDateTimeString())->toBe('2026-10-08 10:00:00');
 });

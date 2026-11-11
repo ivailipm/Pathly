@@ -14,6 +14,15 @@ Built with Laravel, Livewire, Postgres, Redis and Reverb.
   (docs, videos, exercises, notebooks) that move from To do to In progress to Done.
 - **A kanban board per milestone.** Drag cards between columns or use the "Move to" menu. A milestone is finished
   when all of its tasks are done, and the path moves on to the next one.
+- **A board for the whole subject.** The subject page's Board tab shows every task of every milestone in the same
+  three columns, grouped by milestone in path order, with finished milestones folded away. Cards move between
+  columns and stay in their milestone.
+- **Task details.** Click a task to open it in a side panel: its link, time logged, a description (what to do,
+  page numbers, where you stopped) and the field notes written about it. Change its status, edit or delete it there.
+- **Sources.** Each subject keeps the docs, courses and books it's learned from, with or without a link. Add them
+  when creating the subject (one per line), on the subject page, or straight from a task's link.
+- **Any colour.** Pick a preset or any colour for a subject; Pathly turns it into a soft background and readable text
+  in that hue, so every subject fits the paper look.
 - **Live updates.** Open the same board in two tabs or on two devices: a change in one appears in the other at
   once, over WebSockets (Laravel Reverb). A dot in the header shows whether the board is Live or Offline.
 - **Study sessions.** Start a timer on a task or log time by hand. Sessions feed the streak, the week chart and the
@@ -29,9 +38,13 @@ Built with Laravel, Livewire, Postgres, Redis and Reverb.
 
 | Library | Subject |
 | --- | --- |
-| ![The library: every subject with its current milestone and progress](docs/screenshots/library.png) | ![A subject: its properties and the path of milestones, with notes in the margin](docs/screenshots/subject.png) |
+| ![The library: every subject with its current milestone and progress](docs/screenshots/library.png) | ![A subject: its properties and the path of milestones, with notes and sources in the margin](docs/screenshots/subject.png) |
 
 ![A milestone's board, live over Reverb, with field notes below](docs/screenshots/milestone.png)
+
+| The subject's board | A task's details |
+| --- | --- |
+| ![Every task of a subject in three columns, grouped by milestone](docs/screenshots/board.png) | ![The task panel: status, description and linked field notes](docs/screenshots/panel.png) |
 
 It works on a phone too:
 
@@ -96,14 +109,20 @@ erDiagram
     SUBJECT ||--o{ STUDY_SESSION : "time on"
     TASK |o--o{ STUDY_SESSION : "time on"
     USER ||--o{ NOTIFICATION : receives
+    SUBJECT ||--o{ SOURCE : "learned from"
 
     SUBJECT {
         string title
         string status "active, paused, archived"
         date target_date
         json tags
-        string colour
+        string colour "#rrggbb"
         timestamp nudged_at
+    }
+    SOURCE {
+        string title
+        string url "null for a book"
+        int position
     }
     MILESTONE {
         int position
@@ -112,6 +131,7 @@ erDiagram
     TASK {
         string title
         string url
+        text description
         string type "docs, video, exercise, notebook"
         string status "todo, in_progress, done"
         int position
@@ -260,11 +280,12 @@ app/
   Enums/          TaskStatus, TaskType, SubjectStatus, SubjectColour
   Events/         BoardChanged (broadcast on private-milestones.{id})
   Jobs/           SendNudges (daily reminder)
-  Livewire/       Today, Subjects\Index|Show, Milestones\Show, Notes\Index, Sessions\LogSession, Forms\*
-  Models/         User, Subject, Milestone, Task, StudySession, Note
+  Livewire/       Today, Subjects\Index|Show|Board|Sources, Milestones\Show, Tasks\Panel, Notes\Index,
+                  Sessions\LogSession, Forms\*
+  Models/         User, Subject, Milestone, Task, StudySession, Note, Source
   Notifications/  FinishWhatYouStart (mail + database)
   Policies/       SubjectPolicy
-  Support/        LocalTime, Streak, WeekChart
+  Support/        LocalTime, Streak, WeekChart, Tint (subject colours), Link
 database/seeders/ DemoSeeder (the demo library)
 routes/           web.php, channels.php, console.php (schedule)
 tests/Feature/    one folder per area

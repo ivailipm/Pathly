@@ -26,6 +26,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['subject_id', 'task_id', 'started_at', 'minutes'])]
 class StudySession extends Model
 {
+    /**
+     * A timer running longer than this is treated as forgotten: discarded, not saved (spec assumption 11).
+     */
+    public const MAX_TIMER_MINUTES = 600;
+
     /** @use HasFactory<StudySessionFactory> */
     use HasFactory;
 
@@ -82,5 +87,25 @@ class StudySession extends Model
     public function scopeRunning(Builder $query): void
     {
         $query->whereNull('study_sessions.minutes');
+    }
+
+    /**
+     * Stop a running timer and save its minutes (at least 1). A timer that ran over MAX_TIMER_MINUTES was
+     * forgotten: it's deleted instead. Returns whether the time was saved.
+     */
+    public function stop(): bool
+    {
+        // Carbon 3 returns a signed float
+        $minutes = (int) ceil(abs($this->started_at->diffInSeconds(now())) / 60);
+
+        if ($minutes > self::MAX_TIMER_MINUTES) {
+            $this->delete();
+
+            return false;
+        }
+
+        $this->update(['minutes' => max(1, $minutes)]);
+
+        return true;
     }
 }

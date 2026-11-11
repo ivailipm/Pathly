@@ -31,6 +31,19 @@ class DemoSeeder extends Seeder
 {
     use WithoutModelEvents;
 
+    /**
+     * Descriptions for the tasks someone is working on, by task title.
+     */
+    private const DESCRIPTIONS = [
+        'Build a presence channel for live cursors' => "Show who else has this board open, then broadcast card moves.\n\nStart with the member list on join and leave; cursors only once that works.",
+        'Read: Echo client API' => 'Sections on private and presence channels, and listening for events with a leading dot.',
+        'Scale Reverb horizontally with Redis' => 'Only matters with more than one server. Read it, write down what changes in the .env, move on.',
+        'Gradient descent, worked by hand' => "Three steps on y = 2x + 1 with a learning rate of 0.1, by hand first, then the same in the notebook.\n\nStopped after step two: check the sign of the gradient.",
+        'Read: Least squares and the normal equation' => 'Chapter 9.2 of Mathematics for Machine Learning, pages 293 to 299.',
+        'Subjunctive after “ojalá”' => 'Ten sentences out loud, then ten written. Mix present and imperfect subjunctive.',
+        'Write ten wishes for next year' => 'Use ojalá, espero que and quiero que at least three times each.',
+    ];
+
     /** @var array<string, Milestone> seeded milestones by title (titles are unique in the demo) */
     private array $milestones = [];
 
@@ -103,6 +116,7 @@ class DemoSeeder extends Seeder
                 $this->tasks[$task[0]] = $milestone->tasks()->create([
                     'title' => $task[0],
                     'url' => $task[1],
+                    'description' => self::DESCRIPTIONS[$task[0]] ?? null,
                     'type' => $task[2],
                     'status' => $task[3] ?? ($completedAt === null ? TaskStatus::Todo : TaskStatus::Done),
                     'position' => $position + 1,

@@ -165,137 +165,125 @@
                                     'border-rule/70 bg-paper px-3.5 py-3' => $isDone,
                                 ])
                             >
-                                @if ($editingTaskId === $task->id)
-                                    <form wire:submit="updateTask" class="min-w-0 flex-1 space-y-3">
-                                        <flux:input wire:model="editTaskForm.title" :label="__('Title')" required />
-                                        <flux:input wire:model="editTaskForm.url" :label="__('Link')" type="url" placeholder="https://" />
-                                        <flux:select wire:model="editTaskForm.type" :label="__('Type')">
-                                            <flux:select.option value="">{{ __('No type') }}</flux:select.option>
-                                            @foreach (TaskType::cases() as $type)
-                                                <flux:select.option :value="$type->value">{{ __($type->label()) }}</flux:select.option>
-                                            @endforeach
-                                        </flux:select>
+                                @if ($isDone)
+                                    <flux:icon.check variant="micro" class="mt-0.5 size-4 flex-none text-muted" />
+                                @endif
 
-                                        <div class="flex gap-2">
-                                            <flux:button type="submit" variant="primary">{{ __('Save') }}</flux:button>
-                                            <flux:button type="button" variant="ghost" wire:click="cancelTaskEdit">{{ __('Cancel') }}</flux:button>
+                                <div @class(['flex min-w-0 flex-1 flex-col', 'gap-2.5' => ! $isDone, 'gap-0.5' => $isDone])>
+                                    @if (! $isDone && ($label !== '' || $minutes > 0))
+                                        <div class="flex items-baseline justify-between gap-2">
+                                            <span @class([
+                                                'font-mono text-[11px] tracking-label uppercase',
+                                                'text-vermilion' => $isUpNext,
+                                                'text-muted' => ! $isUpNext,
+                                            ])>{{ $label }}</span>
+
+                                            @if ($minutes > 0)
+                                                <x-duration :minutes="$minutes" class="font-mono text-[11px] whitespace-nowrap text-muted" />
+                                            @endif
                                         </div>
-                                    </form>
-                                @else
-                                    @if ($isDone)
-                                        <flux:icon.check variant="micro" class="mt-0.5 size-4 flex-none text-muted" />
                                     @endif
 
-                                    <div @class(['flex min-w-0 flex-1 flex-col', 'gap-2.5' => ! $isDone, 'gap-0.5' => $isDone])>
-                                        @if (! $isDone && ($label !== '' || $minutes > 0))
-                                            <div class="flex items-baseline justify-between gap-2">
-                                                <span @class([
-                                                    'font-mono text-[11px] tracking-label uppercase',
-                                                    'text-vermilion' => $isUpNext,
-                                                    'text-muted' => ! $isUpNext,
-                                                ])>{{ $label }}</span>
-
-                                                @if ($minutes > 0)
-                                                    <x-duration :minutes="$minutes" class="font-mono text-[11px] whitespace-nowrap text-muted" />
-                                                @endif
-                                            </div>
-                                        @endif
-
-                                        <span @class([
+                                    {{-- Opens the task panel (livewire:tasks.panel) --}}
+                                    <button
+                                        type="button"
+                                        wire:click="$dispatch('open-task', { id: {{ $task->id }} })"
+                                        @class([
+                                            'self-start text-left underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ink',
                                             'text-[15px] leading-[1.35] font-medium text-ink' => ! $isDone,
                                             'text-sm text-muted line-through decoration-zinc-400' => $isDone,
-                                        ])>{{ $task->title }}</span>
+                                        ])
+                                    >{{ $task->title }}</button>
 
-                                        @if ($task->url)
-                                            <a
-                                                href="{{ $task->url }}"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                @class([
-                                                    'flex max-w-full min-w-0 items-center gap-1.5 self-start font-mono text-muted hover:text-ink',
-                                                    'text-xs' => ! $isDone,
-                                                    'text-[11px]' => $isDone,
-                                                ])
-                                            >
-                                                @unless ($isDone)
-                                                    <flux:icon.link variant="micro" class="size-[13px] flex-none" />
-                                                @endunless
-                                                <span class="min-w-0 truncate">{{ $task->display_url }}</span>
-                                            </a>
-                                        @elseif ($isDone && $typeLabel)
-                                            <span class="font-mono text-[11px] text-muted">{{ $typeLabel }}</span>
-                                        @endif
-
-                                        @if ($isRunning)
-                                            <div class="flex flex-wrap items-center gap-2 pt-1">
-                                                <flux:button size="sm" icon="stop" wire:click="stopTimer" class="min-h-10">{{ __('Stop timer') }}</flux:button>
-
-                                                {{-- Display only: the server works out the minutes when the timer stops --}}
-                                                <span
-                                                    wire:key="clock-{{ $runningSession->id }}"
-                                                    x-data="{
-                                                        start: Date.parse(@js($runningSession->started_at->toIso8601String())),
-                                                        now: Date.now(),
-                                                        tick: null,
-                                                        init() { this.tick = setInterval(() => this.now = Date.now(), 1000) },
-                                                        destroy() { clearInterval(this.tick) },
-                                                        get elapsed() {
-                                                            const seconds = Math.max(0, Math.floor((this.now - this.start) / 1000));
-                                                            return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
-                                                        },
-                                                    }"
-                                                    x-text="elapsed"
-                                                    role="timer"
-                                                    aria-label="{{ __('Time on this task') }}"
-                                                    class="font-mono text-xs text-vermilion tabular-nums"
-                                                >00:00</span>
-                                            </div>
-                                        @elseif ($canTime)
-                                            <div class="pt-1">
-                                                <flux:button size="sm" icon="play" wire:click="startTimer({{ $task->id }})" class="min-h-10">{{ __('Start timer') }}</flux:button>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <div class="-me-2 -mt-2 flex flex-none items-center">
-                                        <span
-                                            wire:sort:handle
-                                            aria-hidden="true"
-                                            class="flex size-8 cursor-grab items-center justify-center text-zinc-400 group-focus-within:opacity-100 group-hover:opacity-100 active:cursor-grabbing pointer-fine:opacity-0"
+                                    @if ($task->url)
+                                        <a
+                                            href="{{ $task->url }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            @class([
+                                                'flex max-w-full min-w-0 items-center gap-1.5 self-start font-mono text-muted hover:text-ink',
+                                                'text-xs' => ! $isDone,
+                                                'text-[11px]' => $isDone,
+                                            ])
                                         >
-                                            <flux:icon.grip-vertical variant="micro" />
-                                        </span>
+                                            @unless ($isDone)
+                                                <flux:icon.link variant="micro" class="size-[13px] flex-none" />
+                                            @endunless
+                                            <span class="min-w-0 truncate">{{ $task->display_url }}</span>
+                                        </a>
+                                    @elseif ($isDone && $typeLabel)
+                                        <span class="font-mono text-[11px] text-muted">{{ $typeLabel }}</span>
+                                    @endif
 
-                                        <flux:dropdown align="end">
-                                            <flux:button variant="ghost" icon="ellipsis-horizontal" :aria-label="__('Task actions')" class="text-muted!" />
+                                    @if ($isRunning)
+                                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                                            <flux:button size="sm" icon="stop" wire:click="stopTimer" class="min-h-10">{{ __('Stop timer') }}</flux:button>
 
-                                            <flux:menu>
-                                                @foreach (TaskStatus::cases() as $other)
-                                                    @continue($other === $status)
+                                            {{-- Display only: the server works out the minutes when the timer stops --}}
+                                            <span
+                                                wire:key="clock-{{ $runningSession->id }}"
+                                                x-data="{
+                                                    start: Date.parse(@js($runningSession->started_at->toIso8601String())),
+                                                    now: Date.now(),
+                                                    tick: null,
+                                                    init() { this.tick = setInterval(() => this.now = Date.now(), 1000) },
+                                                    destroy() { clearInterval(this.tick) },
+                                                    get elapsed() {
+                                                        const seconds = Math.max(0, Math.floor((this.now - this.start) / 1000));
+                                                        return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+                                                    },
+                                                }"
+                                                x-text="elapsed"
+                                                role="timer"
+                                                aria-label="{{ __('Time on this task') }}"
+                                                class="font-mono text-xs text-vermilion tabular-nums"
+                                            >00:00</span>
+                                        </div>
+                                    @elseif ($canTime)
+                                        <div class="pt-1">
+                                            <flux:button size="sm" icon="play" wire:click="startTimer({{ $task->id }})" class="min-h-10">{{ __('Start timer') }}</flux:button>
+                                        </div>
+                                    @endif
+                                </div>
 
-                                                    <flux:menu.item wire:click="moveTask({{ $task->id }}, {{ $this->columns[$other->value]->count() }}, '{{ $other->value }}')">
-                                                        {{ __('Move to :status', ['status' => __($other->label())]) }}
-                                                    </flux:menu.item>
-                                                @endforeach
+                                <div class="-me-2 -mt-2 flex flex-none items-center">
+                                    <span
+                                        wire:sort:handle
+                                        aria-hidden="true"
+                                        class="flex size-8 cursor-grab items-center justify-center text-zinc-400 group-focus-within:opacity-100 group-hover:opacity-100 active:cursor-grabbing pointer-fine:opacity-0"
+                                    >
+                                        <flux:icon.grip-vertical variant="micro" />
+                                    </span>
 
-                                                <flux:menu.separator />
+                                    <flux:dropdown align="end">
+                                        <flux:button variant="ghost" icon="ellipsis-horizontal" :aria-label="__('Task actions')" class="text-muted!" />
 
-                                                <flux:menu.item icon="pencil" wire:click="editTask({{ $task->id }})">{{ __('Edit') }}</flux:menu.item>
-                                                @if ($task->url !== null && ! in_array($task->url, $sourceUrls, true))
-                                                    <flux:menu.item icon="bookmark" wire:click="pinSource({{ $task->id }})">{{ __('Add link to sources') }}</flux:menu.item>
-                                                @endif
-                                                <flux:menu.item
-                                                    icon="trash"
-                                                    variant="danger"
-                                                    wire:click="deleteTask({{ $task->id }})"
-                                                    wire:confirm="{{ __('Delete this task?') }}"
-                                                >
-                                                    {{ __('Delete') }}
+                                        <flux:menu>
+                                            @foreach (TaskStatus::cases() as $other)
+                                                @continue($other === $status)
+
+                                                <flux:menu.item wire:click="moveTask({{ $task->id }}, {{ $this->columns[$other->value]->count() }}, '{{ $other->value }}')">
+                                                    {{ __('Move to :status', ['status' => __($other->label())]) }}
                                                 </flux:menu.item>
-                                            </flux:menu>
-                                        </flux:dropdown>
-                                    </div>
-                                @endif
+                                            @endforeach
+
+                                            <flux:menu.separator />
+
+                                            <flux:menu.item icon="pencil" wire:click="$dispatch('open-task', { id: {{ $task->id }}, edit: true })">{{ __('Edit') }}</flux:menu.item>
+                                            @if ($task->url !== null && ! in_array($task->url, $sourceUrls, true))
+                                                <flux:menu.item icon="bookmark" wire:click="pinSource({{ $task->id }})">{{ __('Add link to sources') }}</flux:menu.item>
+                                            @endif
+                                            <flux:menu.item
+                                                icon="trash"
+                                                variant="danger"
+                                                wire:click="deleteTask({{ $task->id }})"
+                                                wire:confirm="{{ __('Delete this task?') }}"
+                                            >
+                                                {{ __('Delete') }}
+                                            </flux:menu.item>
+                                        </flux:menu>
+                                    </flux:dropdown>
+                                </div>
                             </article>
                         @endforeach
                     </div>
@@ -405,4 +393,5 @@
     </flux:modal>
 
     <livewire:sessions.log-session :milestone="$milestone" />
+    <livewire:tasks.panel :subject="$subject" />
 </div>
