@@ -42,6 +42,15 @@ final class LocalTime
     }
 
     /**
+     * Whole local days from a UTC timestamp's day to today: 0 = today, 1 = yesterday.
+     */
+    public static function daysSince(CarbonInterface $time): int
+    {
+        // round(): days around a daylight-saving change are 23 or 25 hours long
+        return (int) round(self::of($time)->startOfDay()->diffInDays(self::today()));
+    }
+
+    /**
      * The first and last UTC moment of a local day, for whereBetween() on UTC columns.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}

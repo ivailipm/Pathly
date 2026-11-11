@@ -20,12 +20,29 @@ class Profile extends Component
     public string $email = '';
 
     /**
+     * "Finish what you start" reminders (SendNudges). Saved as soon as it changes.
+     */
+    public bool $wantsNudges = true;
+
+    /**
      * Mount the component.
      */
     public function mount(): void
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->wantsNudges = Auth::user()->wants_nudges;
+    }
+
+    public function updatedWantsNudges(): void
+    {
+        $user = Auth::user();
+
+        // Not fillable: set on its own, never from the profile form's validated data
+        $user->wants_nudges = $this->wantsNudges;
+        $user->save();
+
+        Flux::toast(variant: 'success', text: $this->wantsNudges ? __('Reminders on.') : __('Reminders off.'));
     }
 
     /**

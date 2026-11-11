@@ -70,6 +70,9 @@ return [
     // Storage stays UTC; "today", day grouping and displayed times use this zone
     'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Sofia'),
 
+    // "Finish what you start": remind about a started subject after this many quiet days (in the display timezone)
+    'nudge_after_days' => (int) env('NUDGE_AFTER_DAYS', 3),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

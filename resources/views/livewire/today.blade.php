@@ -4,6 +4,7 @@
     $upNext = $this->upNext;
     $latestNote = $this->latestNote;
     $deskCount = $this->deskCount;
+    $nudge = $this->nudge;
 
     // "2 tasks are on your desk, and <em>Reverb</em> is 3 steps from done. Pick up where you left off."
     $summary = e($deskCount > 0
@@ -44,6 +45,26 @@
     </x-page-header>
 
     <div class="mx-auto flex w-full max-w-[1120px] flex-col gap-14 px-4 pt-12 pb-24 sm:px-10">
+        {{-- The daily "finish what you start" reminder (SendNudges), until dismissed --}}
+        @if ($nudge)
+            <section wire:key="nudge-{{ $nudge->id }}" class="-mb-6 flex items-start justify-between gap-4 rounded-card border border-rule bg-white px-6 py-5" aria-labelledby="nudge-heading">
+                <div class="flex min-w-0 flex-col gap-2">
+                    <h2 id="nudge-heading"><x-eyebrow>{{ __('Finish what you start') }}</x-eyebrow></h2>
+
+                    <ul class="flex flex-col gap-1 font-serif text-lg leading-snug text-body">
+                        @foreach ($nudge->data['subjects'] ?? [] as $quiet)
+                            <li>
+                                <a href="{{ route('subjects.show', $quiet['id']) }}" wire:navigate class="italic text-ink underline-offset-4 hover:text-vermilion hover:underline">{{ $quiet['title'] }}</a>
+                                {{ trans_choice('has been quiet for :count day|has been quiet for :count days', $quiet['days']) }}@if (filled($quiet['milestone'])), {{ __('next up') }} <em>{{ $quiet['milestone'] }}</em>@endif.
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
+                <flux:button variant="ghost" icon="x-mark" wire:click="dismissNudge('{{ $nudge->id }}')" :aria-label="__('Dismiss reminder')" class="-me-2 -mt-1 text-muted!" />
+            </section>
+        @endif
+
         {{-- The date, the greeting and what the day looks like --}}
         <section class="flex flex-col gap-5">
             <div class="flex flex-wrap justify-between gap-2 border-b-2 border-ink pb-2.5 font-mono text-xs tracking-label uppercase">
