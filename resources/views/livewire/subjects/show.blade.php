@@ -156,164 +156,191 @@
             @endif
         </section>
 
-        <section class="flex flex-wrap gap-14 pt-2">
-            <div class="flex min-w-0 flex-[2_1_520px] flex-col">
-                <div class="flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-ink pb-3.5">
-                    <h2 class="font-serif text-[34px] leading-tight">{{ __('The path') }}</h2>
-
-                    @if ($this->milestones->isNotEmpty())
-                        <x-eyebrow>
-                            {{ trans_choice(':done of :total milestone|:done of :total milestones', $this->milestones->count(), ['done' => $this->doneMilestonesCount, 'total' => $this->milestones->count()]) }}
-                        </x-eyebrow>
-                    @endif
+        <div class="flex flex-col gap-8">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-rule">
+                <div role="group" aria-label="{{ __('View') }}" class="flex gap-6">
+                    @foreach (['path' => __('Path'), 'board' => __('Board')] as $value => $label)
+                        <button
+                            type="button"
+                            wire:click="$set('view', '{{ $value }}')"
+                            aria-pressed="{{ $view === $value ? 'true' : 'false' }}"
+                            @class([
+                                '-mb-px flex min-h-11 items-center border-b-2 text-sm focus-visible:outline-2 focus-visible:outline-ink',
+                                'border-ink font-medium text-ink' => $view === $value,
+                                'border-transparent text-muted hover:text-ink' => $view !== $value,
+                            ])
+                        >{{ $label }}</button>
+                    @endforeach
                 </div>
 
-                @if ($this->milestones->isEmpty())
-                    <p class="border-b border-rule py-5 text-secondary">{{ __('No milestones yet. Add the first step below.') }}</p>
-                @else
-                    <ol class="flex flex-col">
-                        @foreach ($this->milestones as $milestone)
-                            @php
-                                $number = sprintf('%02d', $milestone->number);
-                                $taskLabel = trans_choice(':done of :total task done|:done of :total tasks done', $milestone->tasks_count, ['done' => $milestone->done_tasks_count, 'total' => $milestone->tasks_count]);
-                            @endphp
-
-                            @if ($milestone->id === $this->currentMilestoneId)
-                                {{-- The current milestone: the raised card --}}
-                                <li wire:key="milestone-{{ $milestone->id }}" class="-mx-3 my-2 rounded-card border border-rule bg-white shadow-[0_1px_3px_rgba(25,25,23,0.05)] sm:-mx-5">
-                                    <a
-                                        href="{{ route('milestones.show', [$subject, $milestone]) }}"
-                                        wire:navigate
-                                        class="group flex gap-4 rounded-card px-3 py-[22px] text-ink focus-visible:outline-2 focus-visible:outline-ink sm:gap-5 sm:px-5"
-                                    >
-                                        <span class="w-10 flex-none font-serif text-[30px] leading-none text-vermilion sm:w-12">{{ $number }}</span>
-
-                                        <div class="flex min-w-0 flex-1 flex-col gap-2.5">
-                                            <div class="flex flex-col gap-1">
-                                                <span class="font-serif text-[26px] leading-[1.15] group-hover:text-vermilion">{{ $milestone->title }}</span>
-                                                @if (filled($milestone->description))
-                                                    <span class="text-sm text-secondary">{{ $milestone->description }}</span>
-                                                @endif
-                                            </div>
-
-                                            @if ($milestone->tasks_count > 0)
-                                                <div class="flex items-center gap-3">
-                                                    <x-progress-segments
-                                                        :done="$milestone->done_tasks_count"
-                                                        :in-progress="$milestone->in_progress_tasks_count"
-                                                        :total="$milestone->tasks_count"
-                                                        class="max-w-[280px] flex-1"
-                                                    />
-                                                    <span class="font-mono text-xs text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
-                                                </div>
-                                            @else
-                                                <span class="text-sm text-muted">{{ __('No tasks yet') }}</span>
-                                            @endif
-                                        </div>
-
-                                        <span class="self-start font-mono text-xs whitespace-nowrap text-vermilion">
-                                            {{ $milestone->done_tasks_count + $milestone->in_progress_tasks_count > 0 ? __('In progress') : __('Up next') }}
-                                        </span>
-                                    </a>
-                                </li>
-                            @else
-                                <li wire:key="milestone-{{ $milestone->id }}" class="border-b border-rule">
-                                    <a
-                                        href="{{ route('milestones.show', [$subject, $milestone]) }}"
-                                        wire:navigate
-                                        class="group flex gap-4 py-5 focus-visible:outline-2 focus-visible:outline-ink sm:gap-5"
-                                    >
-                                        <span @class([
-                                            'w-10 flex-none font-serif text-[30px] leading-none sm:w-12',
-                                            'text-zinc-400' => $milestone->is_done,
-                                            'text-ink' => ! $milestone->is_done,
-                                        ])>{{ $number }}</span>
-
-                                        <div class="flex min-w-0 flex-1 flex-col gap-1">
-                                            <span @class([
-                                                'text-[17px] font-medium group-hover:text-vermilion',
-                                                'text-muted' => $milestone->is_done,
-                                                'text-ink' => ! $milestone->is_done,
-                                            ])>{{ $milestone->title }}</span>
-                                            @if (filled($milestone->description))
-                                                <span @class(['text-sm', 'text-muted' => $milestone->is_done, 'text-secondary' => ! $milestone->is_done])>{{ $milestone->description }}</span>
-                                            @endif
-                                        </div>
-
-                                        @if ($milestone->is_done)
-                                            <span class="flex items-center gap-1.5 self-start font-mono text-xs whitespace-nowrap text-muted">
-                                                <flux:icon.check variant="micro" class="size-3.5" />
-                                                {{ __('Done') }} · <x-local-date :value="$milestone->completed_at" format="D MMM" />
-                                            </span>
-                                        @elseif ($milestone->tasks_count > 0)
-                                            <span class="self-start font-mono text-xs whitespace-nowrap text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
-                                        @else
-                                            <span class="self-start font-mono text-xs whitespace-nowrap text-muted">{{ __('No tasks yet') }}</span>
-                                        @endif
-
-                                        @if ($milestone->tasks_count > 0)
-                                            <span class="sr-only">{{ $taskLabel }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                            @endif
-                        @endforeach
-                    </ol>
-                @endif
-
-                @if ($addingMilestone)
-                    <form wire:submit="addMilestone" class="mt-6 flex flex-col gap-4 rounded-card border border-rule bg-white p-5">
-                        <x-eyebrow>{{ __('Milestone :number', ['number' => $nextNumber]) }}</x-eyebrow>
-                        <flux:input wire:model="milestoneForm.title" :label="__('Title')" required autofocus />
-                        <flux:textarea wire:model="milestoneForm.description" :label="__('Description')" rows="2" />
-
-                        <div class="flex gap-2">
-                            <flux:button type="submit" variant="primary">{{ __('Add milestone') }}</flux:button>
-                            <flux:button type="button" variant="ghost" wire:click="$set('addingMilestone', false)">{{ __('Cancel') }}</flux:button>
-                        </div>
-                    </form>
-                @else
-                    <button
-                        type="button"
-                        wire:click="$set('addingMilestone', true)"
-                        class="flex min-h-13 items-center gap-2.5 self-start rounded-button px-1 text-[15px] text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
-                    >
-                        <flux:icon.plus class="size-4" />
-                        {{ __('Add milestone :number', ['number' => $nextNumber]) }}
-                    </button>
+                @if ($view === 'board')
+                    <span class="hidden text-[13px] text-muted sm:inline">{{ __('Every task, by milestone. Drag cards between columns.') }}</span>
                 @endif
             </div>
 
-            <aside class="flex min-w-0 flex-[1_1_260px] flex-col gap-12">
-                @if ($this->recentNotes->isNotEmpty())
-                    <section class="flex flex-col gap-1" aria-labelledby="margins-heading">
-                        <h2 id="margins-heading" class="border-b border-ink pb-3">
-                            <x-eyebrow>{{ __('In the margins') }}</x-eyebrow>
-                        </h2>
+            @if ($view === 'board')
+                <livewire:subjects.board :subject="$subject" :key="'board-'.$subject->id" />
+            @else
+                <section class="flex flex-wrap gap-14">
+                <div class="flex min-w-0 flex-[2_1_520px] flex-col">
+                    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-ink pb-3.5">
+                        <h2 class="font-serif text-[34px] leading-tight">{{ __('The path') }}</h2>
 
-                        @foreach ($this->recentNotes as $note)
-                            <a
-                                href="{{ route('milestones.show', [$subject, $note->milestone]) }}"
-                                wire:navigate
-                                wire:key="margin-note-{{ $note->id }}"
-                                class="group flex flex-col gap-1.5 border-b border-rule py-4 focus-visible:outline-2 focus-visible:outline-ink"
-                            >
-                                <span class="font-mono text-[11px] text-muted uppercase">
-                                    <x-local-date :value="$note->created_at" format="ddd D MMM" /> · {{ sprintf('%02d', $note->milestone->number) }}
-                                </span>
-                                <p class="line-clamp-5 font-serif text-[17px] leading-[1.45] text-ink group-hover:text-vermilion">{{ $note->body }}</p>
+                        @if ($this->milestones->isNotEmpty())
+                            <x-eyebrow>
+                                {{ trans_choice(':done of :total milestone|:done of :total milestones', $this->milestones->count(), ['done' => $this->doneMilestonesCount, 'total' => $this->milestones->count()]) }}
+                            </x-eyebrow>
+                        @endif
+                    </div>
+
+                    @if ($this->milestones->isEmpty())
+                        <p class="border-b border-rule py-5 text-secondary">{{ __('No milestones yet. Add the first step below.') }}</p>
+                    @else
+                        <ol class="flex flex-col">
+                            @foreach ($this->milestones as $milestone)
+                                @php
+                                    $number = sprintf('%02d', $milestone->number);
+                                    $taskLabel = trans_choice(':done of :total task done|:done of :total tasks done', $milestone->tasks_count, ['done' => $milestone->done_tasks_count, 'total' => $milestone->tasks_count]);
+                                @endphp
+
+                                @if ($milestone->id === $this->currentMilestoneId)
+                                    {{-- The current milestone: the raised card --}}
+                                    <li wire:key="milestone-{{ $milestone->id }}" class="-mx-3 my-2 rounded-card border border-rule bg-white shadow-[0_1px_3px_rgba(25,25,23,0.05)] sm:-mx-5">
+                                        <a
+                                            href="{{ route('milestones.show', [$subject, $milestone]) }}"
+                                            wire:navigate
+                                            class="group flex gap-4 rounded-card px-3 py-[22px] text-ink focus-visible:outline-2 focus-visible:outline-ink sm:gap-5 sm:px-5"
+                                        >
+                                            <span class="w-10 flex-none font-serif text-[30px] leading-none text-vermilion sm:w-12">{{ $number }}</span>
+
+                                            <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+                                                <div class="flex flex-col gap-1">
+                                                    <span class="font-serif text-[26px] leading-[1.15] group-hover:text-vermilion">{{ $milestone->title }}</span>
+                                                    @if (filled($milestone->description))
+                                                        <span class="text-sm text-secondary">{{ $milestone->description }}</span>
+                                                    @endif
+                                                </div>
+
+                                                @if ($milestone->tasks_count > 0)
+                                                    <div class="flex items-center gap-3">
+                                                        <x-progress-segments
+                                                            :done="$milestone->done_tasks_count"
+                                                            :in-progress="$milestone->in_progress_tasks_count"
+                                                            :total="$milestone->tasks_count"
+                                                            class="max-w-[280px] flex-1"
+                                                        />
+                                                        <span class="font-mono text-xs text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
+                                                    </div>
+                                                @else
+                                                    <span class="text-sm text-muted">{{ __('No tasks yet') }}</span>
+                                                @endif
+                                            </div>
+
+                                            <span class="self-start font-mono text-xs whitespace-nowrap text-vermilion">
+                                                {{ $milestone->done_tasks_count + $milestone->in_progress_tasks_count > 0 ? __('In progress') : __('Up next') }}
+                                            </span>
+                                        </a>
+                                    </li>
+                                @else
+                                    <li wire:key="milestone-{{ $milestone->id }}" class="border-b border-rule">
+                                        <a
+                                            href="{{ route('milestones.show', [$subject, $milestone]) }}"
+                                            wire:navigate
+                                            class="group flex gap-4 py-5 focus-visible:outline-2 focus-visible:outline-ink sm:gap-5"
+                                        >
+                                            <span @class([
+                                                'w-10 flex-none font-serif text-[30px] leading-none sm:w-12',
+                                                'text-zinc-400' => $milestone->is_done,
+                                                'text-ink' => ! $milestone->is_done,
+                                            ])>{{ $number }}</span>
+
+                                            <div class="flex min-w-0 flex-1 flex-col gap-1">
+                                                <span @class([
+                                                    'text-[17px] font-medium group-hover:text-vermilion',
+                                                    'text-muted' => $milestone->is_done,
+                                                    'text-ink' => ! $milestone->is_done,
+                                                ])>{{ $milestone->title }}</span>
+                                                @if (filled($milestone->description))
+                                                    <span @class(['text-sm', 'text-muted' => $milestone->is_done, 'text-secondary' => ! $milestone->is_done])>{{ $milestone->description }}</span>
+                                                @endif
+                                            </div>
+
+                                            @if ($milestone->is_done)
+                                                <span class="flex items-center gap-1.5 self-start font-mono text-xs whitespace-nowrap text-muted">
+                                                    <flux:icon.check variant="micro" class="size-3.5" />
+                                                    {{ __('Done') }} · <x-local-date :value="$milestone->completed_at" format="D MMM" />
+                                                </span>
+                                            @elseif ($milestone->tasks_count > 0)
+                                                <span class="self-start font-mono text-xs whitespace-nowrap text-muted" aria-hidden="true">{{ $milestone->done_tasks_count }} / {{ $milestone->tasks_count }}</span>
+                                            @else
+                                                <span class="self-start font-mono text-xs whitespace-nowrap text-muted">{{ __('No tasks yet') }}</span>
+                                            @endif
+
+                                            @if ($milestone->tasks_count > 0)
+                                                <span class="sr-only">{{ $taskLabel }}</span>
+                                            @endif
+                                        </a>
+                                    </li>
+                                @endif
+                            @endforeach
+                        </ol>
+                    @endif
+
+                    @if ($addingMilestone)
+                        <form wire:submit="addMilestone" class="mt-6 flex flex-col gap-4 rounded-card border border-rule bg-white p-5">
+                            <x-eyebrow>{{ __('Milestone :number', ['number' => $nextNumber]) }}</x-eyebrow>
+                            <flux:input wire:model="milestoneForm.title" :label="__('Title')" required autofocus />
+                            <flux:textarea wire:model="milestoneForm.description" :label="__('Description')" rows="2" />
+
+                            <div class="flex gap-2">
+                                <flux:button type="submit" variant="primary">{{ __('Add milestone') }}</flux:button>
+                                <flux:button type="button" variant="ghost" wire:click="$set('addingMilestone', false)">{{ __('Cancel') }}</flux:button>
+                            </div>
+                        </form>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="$set('addingMilestone', true)"
+                            class="flex min-h-13 items-center gap-2.5 self-start rounded-button px-1 text-[15px] text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+                        >
+                            <flux:icon.plus class="size-4" />
+                            {{ __('Add milestone :number', ['number' => $nextNumber]) }}
+                        </button>
+                    @endif
+                </div>
+
+                <aside class="flex min-w-0 flex-[1_1_260px] flex-col gap-12">
+                    @if ($this->recentNotes->isNotEmpty())
+                        <section class="flex flex-col gap-1" aria-labelledby="margins-heading">
+                            <h2 id="margins-heading" class="border-b border-ink pb-3">
+                                <x-eyebrow>{{ __('In the margins') }}</x-eyebrow>
+                            </h2>
+
+                            @foreach ($this->recentNotes as $note)
+                                <a
+                                    href="{{ route('milestones.show', [$subject, $note->milestone]) }}"
+                                    wire:navigate
+                                    wire:key="margin-note-{{ $note->id }}"
+                                    class="group flex flex-col gap-1.5 border-b border-rule py-4 focus-visible:outline-2 focus-visible:outline-ink"
+                                >
+                                    <span class="font-mono text-[11px] text-muted uppercase">
+                                        <x-local-date :value="$note->created_at" format="ddd D MMM" /> · {{ sprintf('%02d', $note->milestone->number) }}
+                                    </span>
+                                    <p class="line-clamp-5 font-serif text-[17px] leading-[1.45] text-ink group-hover:text-vermilion">{{ $note->body }}</p>
+                                </a>
+                            @endforeach
+
+                            <a href="{{ route('notes.index') }}" wire:navigate class="self-start pt-3 text-sm text-muted underline underline-offset-4 hover:text-ink">
+                                {{ __('All field notes') }}
                             </a>
-                        @endforeach
+                        </section>
+                    @endif
 
-                        <a href="{{ route('notes.index') }}" wire:navigate class="self-start pt-3 text-sm text-muted underline underline-offset-4 hover:text-ink">
-                            {{ __('All field notes') }}
-                        </a>
-                    </section>
-                @endif
-
-                <livewire:subjects.sources :subject="$subject" :key="'sources-'.$subject->id" />
-            </aside>
-        </section>
+                    <livewire:subjects.sources :subject="$subject" :key="'sources-'.$subject->id" />
+                </aside>
+                </section>
+            @endif
+        </div>
     </div>
 
     <flux:modal wire:model="editing" @close="cancelEdit" class="w-full max-w-md">

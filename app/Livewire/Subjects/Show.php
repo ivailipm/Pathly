@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -18,7 +19,15 @@ use Livewire\Component;
  */
 class Show extends Component
 {
+    public const VIEWS = ['path', 'board'];
+
     public Subject $subject;
+
+    /**
+     * path (the milestones, notes and sources) or board (every task in three columns).
+     */
+    #[Url]
+    public string $view = 'path';
 
     public SubjectForm $form;
 
@@ -32,6 +41,13 @@ class Show extends Component
     {
         // The route's `can` middleware covers real requests; this also covers Livewire::test()
         $this->authorize('view', $this->subject);
+
+        $this->normaliseView();
+    }
+
+    public function updatedView(): void
+    {
+        $this->normaliseView();
     }
 
     public function edit(): void
@@ -136,6 +152,15 @@ class Show extends Component
         unset($this->minutesLogged);
     }
 
+    /**
+     * A task moved, changed or was deleted on the board or in the task panel: the progress changed.
+     */
+    #[On('task-changed')]
+    public function refreshProgress(): void
+    {
+        unset($this->milestones, $this->currentMilestoneId, $this->doneMilestonesCount, $this->minutesLogged);
+    }
+
     #[Computed]
     public function doneMilestonesCount(): int
     {
@@ -145,5 +170,12 @@ class Show extends Component
     public function render(): View
     {
         return view('livewire.subjects.show')->title($this->subject->title);
+    }
+
+    private function normaliseView(): void
+    {
+        if (! in_array($this->view, self::VIEWS, true)) {
+            $this->view = 'path';
+        }
     }
 }
