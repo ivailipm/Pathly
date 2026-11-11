@@ -9,6 +9,7 @@ use App\Models\Note;
 use App\Models\StudySession;
 use App\Models\Subject;
 use App\Models\Task;
+use App\Notifications\FinishWhatYouStart;
 use App\Support\LocalTime;
 use App\Support\Streak;
 use App\Support\WeekChart;
@@ -16,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -231,6 +233,25 @@ class Today extends Component
             ->withLibraryData()
             ->latest('id')
             ->get();
+    }
+
+    /**
+     * The latest unread "finish what you start" reminder, shown at the top of the page until dismissed.
+     */
+    #[Computed]
+    public function nudge(): ?DatabaseNotification
+    {
+        return Auth::user()->unreadNotifications()
+            ->where('type', FinishWhatYouStart::class)
+            ->first();
+    }
+
+    public function dismissNudge(string $id): void
+    {
+        // Through the user's own notifications, so another user's id answers 404
+        Auth::user()->unreadNotifications()->findOrFail($id)->markAsRead();
+
+        unset($this->nudge);
     }
 
     /**

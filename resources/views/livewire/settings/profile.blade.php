@@ -29,6 +29,15 @@
             </div>
         </form>
 
+        <div class="mb-10 space-y-3">
+            <flux:heading level="3">{{ __('Reminders') }}</flux:heading>
+            <flux:checkbox
+                wire:model.live="wantsNudges"
+                :label="__('Remind me when a started subject goes quiet')"
+                :description="trans_choice('One email and a note on Today after :count quiet day.|One email and a note on Today after :count quiet days.', config('app.nudge_after_days'))"
+            />
+        </div>
+
         @if ($this->showDeleteUser)
             <livewire:settings.delete-user-form />
         @endif
