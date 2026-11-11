@@ -3,6 +3,7 @@
 namespace App\Livewire\Sessions;
 
 use App\Enums\SubjectStatus;
+use App\Events\BoardChanged;
 use App\Livewire\Forms\SessionForm;
 use App\Models\Milestone;
 use App\Models\Subject;
@@ -107,6 +108,11 @@ class LogSession extends Component
         Flux::modal('log-session')->close();
 
         $this->dispatch('session-logged');
+
+        // The board's totals changed: other open tabs on this milestone reload it
+        if ($this->milestone !== null) {
+            broadcast(new BoardChanged($this->milestone->id))->toOthers();
+        }
     }
 
     public function render(): View

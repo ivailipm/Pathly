@@ -20,6 +20,34 @@
         </x-slot:breadcrumbs>
 
         <x-slot:actions>
+            {{-- The Reverb connection: green "Live" while connected, muted "Offline" otherwise, hidden without Echo.
+                 wire:ignore keeps Livewire's re-renders from resetting the label Alpine set. --}}
+            <span
+                wire:ignore
+                x-data="{
+                    connection: null,
+                    state: null,
+                    onChange: null,
+                    init() {
+                        this.connection = window.Echo?.connector?.pusher?.connection ?? null
+                        if (! this.connection) return
+                        this.state = this.connection.state
+                        this.onChange = (change) => this.state = change.current
+                        this.connection.bind('state_change', this.onChange)
+                    },
+                    destroy() {
+                        this.connection?.unbind('state_change', this.onChange)
+                    },
+                }"
+                x-show="connection"
+                style="display: none"
+                class="flex min-h-10 items-center gap-1.5 pe-2 font-mono text-xs text-muted"
+                data-test="live-indicator"
+            >
+                <span aria-hidden="true" class="size-[7px] rounded-full" :class="state === 'connected' ? 'bg-live' : 'bg-zinc-400'"></span>
+                <span aria-live="polite" x-text="state === 'connected' ? @js(__('Live')) : @js(__('Offline'))">{{ __('Offline') }}</span>
+            </span>
+
             <flux:button wire:click="edit">{{ __('Edit') }}</flux:button>
 
             <flux:modal.trigger name="log-session">
