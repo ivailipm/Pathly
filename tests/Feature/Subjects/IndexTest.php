@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\SubjectColour;
 use App\Livewire\Subjects\Index;
 use App\Models\Milestone;
 use App\Models\Subject;
@@ -359,12 +358,12 @@ it('defaults a new subject\'s colour to the next in rotation', function () {
 
     Livewire::actingAs($user)
         ->test(Index::class)
-        ->assertSet('form.colour', 'moss')
+        ->assertSet('form.colour', '#4b5320')
         ->set('form.title', 'Data viz')
         ->call('save')
-        ->assertSet('form.colour', 'plum');
+        ->assertSet('form.colour', '#5b3a5b');
 
-    expect(Subject::query()->where('title', 'Data viz')->sole()->colour)->toBe(SubjectColour::Moss);
+    expect(Subject::query()->where('title', 'Data viz')->sole()->colour)->toBe('#4b5320');
 });
 
 it('creates a subject with the chosen colour', function () {
@@ -373,24 +372,54 @@ it('creates a subject with the chosen colour', function () {
     Livewire::actingAs($user)
         ->test(Index::class)
         ->set('form.title', 'Spanish')
-        ->set('form.colour', 'plum')
+        ->set('form.colour', '#5b3a5b')
         ->call('save')
         ->assertHasNoErrors();
 
     $subject = $user->subjects()->sole();
 
-    expect($subject->colour)->toBe(SubjectColour::Plum)
+    expect($subject->colour)->toBe('#5b3a5b')
         ->and($subject->status->value)->toBe('active')
         ->and($subject->tags)->toBe([]);
 });
 
-it('rejects an unknown colour', function () {
+it('creates a subject with any colour from the picker, stored in lowercase', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->set('form.title', 'Spanish')
+        ->set('form.colour', '#E63946')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($user->subjects()->sole()->colour)->toBe('#e63946');
+});
+
+it('rejects a colour that is not #rrggbb', function (string $colour) {
     Livewire::actingAs(User::factory()->create())
         ->test(Index::class)
         ->set('form.title', 'Spanish')
-        ->set('form.colour', 'neon')
+        ->set('form.colour', $colour)
         ->call('save')
         ->assertHasErrors(['form.colour']);
+})->with(['neon', 'clay', '#fff', '#12345g', 'red; background: url(x)', '']);
+
+it('offers the preset colours and any colour in the new subject form', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('creating', true)
+        ->assertSeeInOrder(['Clay', 'Slate', 'Moss', 'Plum', 'Ochre', 'Teal', 'Rose', 'Stone', 'Any colour'])
+        ->assertSeeHtml('type="color"');
+});
+
+it('shows a custom colour\'s tint on its swatch', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(Index::class)
+        ->set('creating', true)
+        ->set('form.colour', '#0000ff')
+        ->assertSee('Custom')
+        ->assertSeeHtml('background-color: #d8e1f2; color: #2e4880');
 });
 
 it('shows paused subjects with their status on the card', function () {

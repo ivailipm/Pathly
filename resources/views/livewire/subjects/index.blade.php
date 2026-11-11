@@ -161,7 +161,7 @@
                 placeholder="Laravel docs https://laravel.com/docs&#10;https://laracasts.com&#10;Laravel: Up &amp; Running (book)"
                 description:trailing="{{ __('Optional. One per line: a link, a title and a link, or just a title for a book.') }}"
             />
-            <x-colour-picker wire:model="form.colour" />
+            <x-colour-picker wire:model="form.colour" :value="$form->colour" />
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>

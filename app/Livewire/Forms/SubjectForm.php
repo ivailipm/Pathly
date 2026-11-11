@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Forms;
 
-use App\Enums\SubjectColour;
 use App\Enums\SubjectStatus;
 use App\Models\Subject;
 use App\Rules\SourceList;
 use App\Rules\TagList;
+use App\Support\Tint;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
@@ -27,7 +27,8 @@ class SubjectForm extends Form
     /** Comma-separated in the form, saved as a list */
     public string $tags = '';
 
-    public string $colour = 'clay';
+    /** "#rrggbb": a preset from Tint::PRESETS or any colour from the picker */
+    public string $colour = Tint::DEFAULT;
 
     /** Only in the New subject form: one source per line, saved by sourceList() */
     public string $sources = '';
@@ -41,7 +42,7 @@ class SubjectForm extends Form
             'status' => ['required', Rule::enum(SubjectStatus::class)],
             'target_date' => ['nullable', 'date_format:Y-m-d'],
             'tags' => ['nullable', 'string', 'max:300', new TagList],
-            'colour' => ['required', Rule::enum(SubjectColour::class)],
+            'colour' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'sources' => ['nullable', 'string', 'max:20000', new SourceList],
         ];
     }
@@ -56,6 +57,7 @@ class SubjectForm extends Form
         $validated = $this->validate();
 
         $validated['tags'] = TagList::parse($validated['tags'] ?? null);
+        $validated['colour'] = strtolower((string) $validated['colour']);
         $validated['target_date'] = filled($validated['target_date'] ?? null) ? $validated['target_date'] : null;
 
         // Not a column: saved as Source rows
@@ -82,7 +84,7 @@ class SubjectForm extends Form
             'status' => $subject->status->value,
             'target_date' => $subject->target_date?->toDateString(),
             'tags' => implode(', ', $subject->tags),
-            'colour' => $subject->colour->value,
+            'colour' => $subject->colour,
         ]);
     }
 }

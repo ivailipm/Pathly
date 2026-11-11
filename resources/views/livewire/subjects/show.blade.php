@@ -340,7 +340,7 @@
                 placeholder="backend, portfolio"
             />
 
-            <x-colour-picker wire:model="form.colour" />
+            <x-colour-picker wire:model="form.colour" :value="$form->colour" />
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>

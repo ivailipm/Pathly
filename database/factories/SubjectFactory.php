@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
-use App\Enums\SubjectColour;
 use App\Enums\SubjectStatus;
 use App\Models\Subject;
 use App\Models\User;
+use App\Support\Tint;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,7 +25,7 @@ class SubjectFactory extends Factory
             'title' => fake()->sentence(3),
             'description' => fake()->optional()->paragraph(),
             'status' => SubjectStatus::Active,
-            'colour' => fake()->randomElement(SubjectColour::cases()),
+            'colour' => fake()->randomElement(Tint::PRESETS),
             'tags' => [],
         ];
     }

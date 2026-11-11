@@ -32,19 +32,7 @@
     --color-vermilion: #b8432a; /* only for in progress, now and up next */
     --color-live: #3e7b4f;
 
-    /* Subject tints: background, text, and the shade of the large decorative letter */
-    --color-clay: #ebdcd2;
-    --color-clay-ink: #7a3b22;
-    --color-clay-shade: #dcc6b7;
-    --color-slate: #d9e2e8;
-    --color-slate-ink: #2d4b5f;
-    --color-slate-shade: #c3d1da;
-    --color-moss: #e2e5d3;
-    --color-moss-ink: #4b5320;
-    --color-moss-shade: #d0d5bc;
-    --color-plum: #e7dde7;
-    --color-plum-ink: #5b3a5b;
-    --color-plum-shade: #d8c8d8;
+    /* Subject tints come from the subject's own colour (App\Support\Tint, set by components/subject-tint) */
 
     --radius-card: 12px;
     --radius-task: 9px;

@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\SubjectColour;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Milestone;
@@ -11,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\FinishWhatYouStart;
 use App\Support\LocalTime;
+use App\Support\Tint;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +25,7 @@ use Illuminate\Database\Seeder;
  *
  * @phpstan-type TaskRow array{0: string, 1: string|null, 2: TaskType|null, 3?: TaskStatus}
  * @phpstan-type MilestoneRow array{0: string, 1: string, 2: int|null, 3: list<TaskRow>}
- * @phpstan-type SubjectRow array{title: string, description: string, colour: SubjectColour, tags: list<string>, target: int|null, started: int, sources: list<array{0: string, 1: string|null}>, milestones: list<MilestoneRow>}
+ * @phpstan-type SubjectRow array{title: string, description: string, colour: string, tags: list<string>, target: int|null, started: int, sources: list<array{0: string, 1: string|null}>, milestones: list<MilestoneRow>}
  */
 class DemoSeeder extends Seeder
 {
@@ -257,7 +257,7 @@ class DemoSeeder extends Seeder
             [
                 'title' => 'Laravel & Livewire',
                 'description' => 'Go from routes and Blade to a real-time, tested app on a real server. This is the stack behind Pathly itself, so every milestone ends with something shipped here.',
-                'colour' => SubjectColour::Clay,
+                'colour' => Tint::PRESETS['Clay'],
                 'tags' => ['backend', 'portfolio'],
                 'target' => 35,
                 'started' => 17,
@@ -312,7 +312,7 @@ class DemoSeeder extends Seeder
             [
                 'title' => 'Machine learning foundations',
                 'description' => 'The maths and the models behind machine learning, worked through by hand before reaching for a library.',
-                'colour' => SubjectColour::Slate,
+                'colour' => Tint::PRESETS['Slate'],
                 'tags' => ['maths'],
                 'target' => 81,
                 'started' => 24,
@@ -356,7 +356,7 @@ class DemoSeeder extends Seeder
             [
                 'title' => 'Spanish to B2',
                 'description' => 'From a comfortable A2 to B2: enough grammar to stop translating in my head, and enough listening to follow a podcast at full speed.',
-                'colour' => SubjectColour::Moss,
+                'colour' => Tint::PRESETS['Moss'],
                 'tags' => ['language'],
                 'target' => null,
                 'started' => 45,
@@ -412,7 +412,7 @@ class DemoSeeder extends Seeder
             [
                 'title' => 'Data visualisation with D3',
                 'description' => 'Charts that explain something: scales, shapes and transitions, ending with a small dashboard of my own.',
-                'colour' => SubjectColour::Plum,
+                'colour' => Tint::PRESETS['Plum'],
                 'tags' => ['javascript'],
                 'target' => null,
                 'started' => 2,
